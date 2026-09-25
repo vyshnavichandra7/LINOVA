@@ -1,0 +1,159 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Deboarding Alert - Next 20 Minutes - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-2">
+  <div class="col-md-10 col-lg-8">
+    
+    <div class="app-card shadow-sm p-4 p-md-5">
+      
+      <!-- Deboarding Beacon Header -->
+      <div class="text-center mb-4">
+        <div class="alert-bell-circle mx-auto mb-3" style="width: 84px; height: 84px; font-size: 2.4rem;">
+          <i class="bi bi-bell-fill"></i>
+        </div>
+
+        <!-- Eyebrow -->
+        <div class="alert-eyebrow fs-6 mb-2 text-danger fw-bold d-flex align-items-center justify-content-center gap-2">
+          <span class="deboard-pulse-dot"></span> DEBOARDING IN NEXT {{ upcoming_eta_minutes|default:18 }} MINUTES
+        </div>
+
+        <!-- Headline -->
+        <h1 class="h2 fw-bold text-dark mb-2">
+          {{ deboarding_count|default_if_none:0 }} Passengers Getting Off at {{ upcoming_station|default:"Secunderabad Junction (SC)" }}
+        </h1>
+
+        <!-- Subtext -->
+        <div class="alert-subtext fs-6 text-muted mb-3">
+          Expected arrival ~06:20 AM · Train {{ handoff.train.train_number }} · Coach {{ handoff.coach.coach_number }} ({{ handoff.shift }} Shift)
+        </div>
+
+        <div class="d-flex justify-content-center gap-2 mb-4">
+          <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" onclick="playRailwayChime()">
+            <i class="bi bi-volume-up-fill text-warning"></i> Play Alert Chime
+          </button>
+          <a href="{% url 'attendant_collect' %}" class="btn btn-warning btn-sm text-dark fw-bold px-3 d-inline-flex align-items-center gap-1">
+            <i class="bi bi-qr-code-scan"></i> Open Collection Scanner
+          </a>
+        </div>
+      </div>
+
+      <!-- DEBOARDING PASSENGER LIST (ORDERED BY BERTH) -->
+      <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <h2 class="h6 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-list-check text-danger"></i> Passengers Alighting at this Station
+          </h2>
+          <span class="badge bg-danger text-white font-mono">Immediate Sweep</span>
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+          {% for dp in deboarding_passengers %}
+          <div class="p-3 rounded-3 border bg-light">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger text-white font-mono fs-6 px-3 py-1">
+                  Berth {{ dp.berth }}
+                </span>
+                <div>
+                  <strong class="text-dark">{{ dp.passenger_name }}</strong>
+                  <div class="small text-muted font-mono">{{ dp.berth_type }} · {{ dp.masked_pnr }}</div>
+                </div>
+              </div>
+              <span class="badge bg-warning text-dark font-mono">
+                <i class="bi bi-clock me-1"></i>ETA: {{ dp.expected_arrival_time }} (~{{ dp.minutes_remaining }} mins)
+              </span>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top">
+              <div class="small text-secondary">
+                <strong class="text-dark">Linen to Collect:</strong>
+                {% for itm in dp.assigned_linen %}
+                  <span class="badge bg-primary font-mono ms-1">{{ itm.type }}: {{ itm.code }}</span>
+                {% endfor %}
+              </div>
+              <a href="{% url 'attendant_collect' %}?berth={{ dp.berth }}&code={{ dp.primary_code }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+                <i class="bi bi-qr-code-scan"></i> Collect & Scan QR
+              </a>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-center text-muted border rounded-3 p-4">
+            No passengers are currently ready to deboard.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Tactile CTA: Start collecting -->
+      <div class="mb-4 text-center">
+        <a href="{% url 'attendant_collect' %}" class="btn-tactile py-3 fs-5" id="startCollectingBtn">
+          Start Coach Sweep & Collect All Linen
+        </a>
+      </div>
+
+      <!-- Divider line -->
+      <div class="alert-divider my-4"></div>
+
+      <!-- Lighter Non-Blocking Card: Passengers boarding -->
+      <a href="{% url 'attendant_issue' %}" class="boarding-lighter-card p-3" id="boardingLighterCard">
+        <div class="fs-2 text-primary d-flex align-items-center justify-content-center p-3" style="width: 52px; height: 52px; background: #eaf1f8; border-radius: 12px;">
+          <i class="bi bi-train-front"></i>
+        </div>
+        <div>
+          <div class="h6 fw-bold mb-1" style="color: var(--ink);">3 passengers boarding at next stop</div>
+          <div class="small text-secondary">Prepare fresh packets — issue linen when ready</div>
+        </div>
+        <div class="ms-auto text-primary fw-bold small">
+          Issue Linen <i class="bi bi-chevron-right"></i>
+        </div>
+      </a>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function playRailwayChime() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      // Tone 1: 587.33 Hz (D5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now);
+      gain1.gain.setValueAtTime(0.2, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.35);
+
+      // Tone 2: 880.00 Hz (A5)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880.00, now + 0.22);
+      gain2.gain.setValueAtTime(0.25, now + 0.22);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.22);
+      osc2.stop(now + 0.7);
+    } catch (e) {
+      console.log('Audio chime error:', e);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(playRailwayChime, 400);
+  });
+</script>
+{% endblock %}
+

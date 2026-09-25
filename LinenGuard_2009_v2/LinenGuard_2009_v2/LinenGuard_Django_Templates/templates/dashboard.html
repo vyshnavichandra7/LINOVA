@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Operations Dashboard - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-bold mb-0 text-navy"><i class="bi bi-cpu text-primary me-2"></i>Railway Linen Intelligence Dashboard</h2>
+    <p class="text-muted small mb-0">Real-time QR traceability, checkpoint reconciliation, and break detection</p>
+  </div>
+</div>
+
+<!-- Mission Statement Callout (Section 54) -->
+<div class="mission-banner mb-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h5 class="fw-bold text-white mb-1"><i class="bi bi-diagram-3-fill text-warning me-2"></i>"We don't just count missing linen. We track where the linen lifecycle breaks."</h5>
+      <div class="text-light-50 small">Every scan creates an immutable operational checkpoint. Unaccounted items identify the exact last verified coach and berth.</div>
+    </div>
+    <div class="badge bg-warning text-dark px-3 py-2 fw-bold">
+      <i class="bi bi-shield-check me-1"></i> Indian Railways Operations
+    </div>
+  </div>
+</div>
+
+<!-- Top Metrics Cards (Section 25) -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">TOTAL LINEN</span>
+        <div class="stat-icon bg-subtle-blue"><i class="bi bi-box-seam"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0">{{ analytics.total }}</h3>
+      <span class="text-muted extra-small">Digital identities</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">ISSUED</span>
+        <div class="stat-icon bg-subtle-amber"><i class="bi bi-train-front"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-primary">{{ analytics.issued }}</h3>
+      <span class="text-muted extra-small">In active transit/berths</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">RETURNED</span>
+        <div class="stat-icon bg-subtle-green"><i class="bi bi-check-circle"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-success">{{ analytics.returned }}</h3>
+      <span class="text-muted extra-small">Verified by attender</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3 border-danger">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-danger small fw-semibold">UNACCOUNTED</span>
+        <div class="stat-icon bg-subtle-red"><i class="bi bi-exclamation-octagon"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-danger">{{ analytics.unaccounted }}</h3>
+      <span class="text-danger extra-small fw-semibold"><a href="{% url 'linen_missing' %}" class="text-danger text-decoration-none">Inspect Checkpoints &rarr;</a></span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">IN LAUNDRY</span>
+        <div class="stat-icon bg-subtle-purple"><i class="bi bi-water"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-purple">{{ analytics.in_laundry }}</h3>
+      <span class="text-muted extra-small">Washing & disinfection</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-2">
+    <div class="stat-card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">READY REISSUE</span>
+        <div class="stat-icon bg-subtle-green"><i class="bi bi-arrow-repeat"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-success">{{ analytics.ready_for_reissue }}</h3>
+      <span class="text-muted extra-small">Sanitized kits ready</span>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row (Section 25) -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+        <span>Status Distribution</span>
+        <i class="bi bi-pie-chart text-muted"></i>
+      </div>
+      <div class="card-body" style="height: 260px;">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+        <span>Train-Wise Unaccounted</span>
+        <i class="bi bi-bar-chart text-muted"></i>
+      </div>
+      <div class="card-body" style="height: 260px;">
+        <canvas id="trainChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+        <span>Coach Hotspots</span>
+        <i class="bi bi-fire text-danger"></i>
+      </div>
+      <div class="card-body" style="height: 260px;">
+        <canvas id="coachChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+        <span>Linen Type-Wise Loss</span>
+        <i class="bi bi-tag text-muted"></i>
+      </div>
+      <div class="card-body" style="height: 260px;">
+        <canvas id="typeChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Attender Summary -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="fw-bold mb-0"><i class="bi bi-person-check text-success me-2"></i>Attender Collection Summary</h6>
+      <span class="text-muted small">Supervisor view of assigned work and linen collection progress.</span>
+    </div>
+    <a href="{% url 'attender_management' %}" class="btn btn-sm btn-outline-primary">Manage Jobs</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Attender</th>
+            <th>Active Jobs</th>
+            <th>Expected</th>
+            <th>Collected</th>
+            <th>Pending</th>
+            <th>Discrepancies</th>
+            <th>Latest Assignment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in attender_summary %}
+          <tr>
+            <td>
+              <strong>{{ row.user.get_full_name|default:row.user.username }}</strong>
+              <span class="text-muted small d-block">{{ row.user.profile.badge_number|default:"No badge" }}</span>
+            </td>
+            <td><span class="badge bg-primary">{{ row.active_jobs }}</span></td>
+            <td>{{ row.expected }}</td>
+            <td class="text-success fw-bold">{{ row.collected }}</td>
+            <td class="{% if row.pending %}text-warning fw-bold{% else %}text-muted{% endif %}">{{ row.pending }}</td>
+            <td>{% if row.discrepancies %}<span class="badge bg-danger">{{ row.discrepancies }}</span>{% else %}<span class="text-muted">0</span>{% endif %}</td>
+            <td class="small">
+              {% if row.latest_session %}
+                Train {{ row.latest_session.train.train_number }} / Coach {{ row.latest_session.coach.coach_number }}
+                <span class="badge {% if row.latest_session.status == 'IN_PROGRESS' %}bg-warning text-dark{% elif row.latest_session.status == 'COMPLETED' %}bg-success{% else %}bg-danger{% endif %}">{{ row.latest_session.get_status_display }}</span>
+              {% else %}
+                <span class="text-muted">No assignment yet</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center py-4 text-muted">No attenders are registered.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Lifecycle Events Activity Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="fw-bold mb-0"><i class="bi bi-activity text-primary me-2"></i>Live Lifecycle Events Feed</h6>
+      <span class="text-muted small">Real-time operational checkpoints recorded by attenders, laundry, and trains</span>
+    </div>
+    <a href="{% url 'audit_log' %}" class="btn btn-sm btn-outline-secondary">View Full Audit Log</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Linen Code</th>
+            <th>Type</th>
+            <th>Checkpoint Event</th>
+            <th>Location / Berth</th>
+            <th>Recorded By</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in recent_events %}
+          <tr>
+            <td class="text-muted small">{{ ev.timestamp|date:"d M, H:i" }}</td>
+            <td>
+              <a href="{% url 'linen_detail' ev.linen.linen_code %}" class="fw-bold font-monospace text-decoration-none">
+                {{ ev.linen.linen_code }}
+              </a>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ ev.linen.linen_type }}</span></td>
+            <td>
+              <span class="badge {% if ev.event_type == 'UNACCOUNTED' %}bg-danger{% elif 'COLLECTED' in ev.event_type or 'RETURNED' in ev.event_type %}bg-success{% elif 'ISSUED' in ev.event_type %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ ev.get_event_type_display }}
+              </span>
+            </td>
+            <td class="small text-muted">{{ ev.location }}</td>
+            <td class="small">{{ ev.performed_by.username|default:"System" }}</td>
+            <td>
+              <a href="{% url 'linen_lifecycle' ev.linen.linen_code %}" class="btn btn-sm btn-outline-primary py-0 px-2" title="Inspect visual lifecycle">
+                <i class="bi bi-clock-history me-1"></i>Timeline
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-muted">No events recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/dashboard.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const data = {
+      statusData: {{ status_counts|safe }},
+      trainsData: [
+        {% for t in analytics.trains_data %}
+        {
+          train: { train_number: "{{ t.train.train_number }}" },
+          expected: {{ t.expected }},
+          returned: {{ t.returned }},
+          unaccounted: {{ t.unaccounted }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      coachHotspots: [
+        {% for c in analytics.coach_hotspots %}
+        {
+          coach: { coach_number: "{{ c.coach.coach_number }}" },
+          train: { train_number: "{{ c.train.train_number }}" },
+          unaccounted: {{ c.unaccounted }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      typeLoss: [
+        {% for l in analytics.type_loss %}
+        {
+          type: "{{ l.type }}",
+          unaccounted: {{ l.unaccounted }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ]
+    };
+    initDashboardCharts(data);
+  });
+</script>
+{% endblock %}

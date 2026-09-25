@@ -1,0 +1,288 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Laundry Intake Scan - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Header & Tab Navigation -->
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <div>
+      <h1 class="h4 fw-bold mb-0 text-dark">Central Railway Laundry Intake</h1>
+      <div class="text-secondary small">Arrival Verification & Washing Cycle Dispatch</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'laundry_register' %}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-tag-fill"></i> Register Linen
+      </a>
+      <a href="{% url 'laundry_intake' %}" class="btn btn-primary d-inline-flex align-items-center gap-1 shadow-sm">
+        <i class="bi bi-qr-code-scan"></i> Intake Scan
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <div class="col-12">
+      <div class="app-card shadow-sm border p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div>
+            <h2 class="h6 fw-bold text-dark mb-1">Collected from Train</h2>
+            <div class="small text-secondary">Returned linen waiting for laundry intake and washing.</div>
+          </div>
+          <span class="badge bg-warning text-dark font-mono">{{ returned_items|length }} Pending Intake</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr class="text-secondary small text-uppercase">
+                <th>Linen ID</th>
+                <th>Type</th>
+                <th>Last Location</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="returnedLinenTableBody">
+              {% for item in returned_items %}
+              <tr id="returned-row-{{ item.linen_code }}">
+                <td class="font-monospace fw-bold">{{ item.linen_code }}</td>
+                <td>{{ item.linen_type }}</td>
+                <td class="small text-muted">{{ item.current_location }}</td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="receiveAndWash('{{ item.linen_code }}', this)">
+                    <i class="bi bi-water me-1"></i> Receive & Start Washing
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr id="returnedEmptyRow">
+                <td colspan="4" class="text-center py-3 text-muted">No collected linen is waiting for laundry intake.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Left Column: Scanner Target & Confirmation -->
+    <div class="col-lg-7">
+      <div class="app-card">
+        
+        <!-- Reusing identical scan-target component with corner brackets [  ] -->
+        <div class="scan-target-box" id="scanTargetBox" style="height: 280px;">
+          <div class="scan-corner tl"></div>
+          <div class="scan-corner tr"></div>
+          <div class="scan-corner bl"></div>
+          <div class="scan-corner br"></div>
+          <div class="scan-laser-line"></div>
+          
+          <div class="position-absolute text-white-50 small d-flex flex-column align-items-center">
+            <i class="bi bi-qr-code fs-1 text-warning mb-2"></i>
+            <span class="fs-6 fw-semibold text-white">Scan soiled linen QR for laundry intake</span>
+            <span class="text-white-50">Confirms arrival from train terminal sweep</span>
+          </div>
+        </div>
+
+        <!-- Manual Entry Toggle & Demo Scan -->
+        <div class="d-flex gap-2 my-3">
+          <button type="button" class="btn btn-outline-secondary flex-fill py-2 fw-semibold bg-white" onclick="toggleManual()">
+            <i class="bi bi-keyboard me-1"></i> Enter linen ID manually
+          </button>
+          <button type="button" class="btn btn-outline-dark flex-fill py-2 fw-semibold bg-white" onclick="simulateIntake('{{ demo_code }}')">
+            <i class="bi bi-magic text-warning me-1"></i> Demo Scan: {{ demo_code }}
+          </button>
+        </div>
+
+        <div id="manualSection" class="p-3 bg-light rounded-3 border mb-3" style="display: none;">
+          <label class="rail-input-label">Linen ID</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="manualCodeInput" class="rail-input font-mono" placeholder="BS-10245" value="{{ demo_code }}">
+            <button type="button" class="btn btn-dark px-4 fw-bold" onclick="simulateIntake(document.getElementById('manualCodeInput').value)">Scan</button>
+          </div>
+        </div>
+
+        <!-- Confirmation Card ("Received at laundry", item type + ID) -->
+        <div class="scanned-confirmation-card p-3 my-3" id="intakeConfirmCard" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="scanned-card-eyebrow h6 mb-1">
+                <i class="bi bi-building-check me-1"></i> Received at laundry
+              </div>
+              <div class="scanned-card-code font-mono fs-5" id="intakeCodeLabel">
+                {{ demo_code }}
+              </div>
+              <div class="small text-secondary mt-1" id="intakeTypeLabel">
+                Category: Bedsheet · Inward Terminal Sweep Batch
+              </div>
+            </div>
+            <span class="badge bg-success py-2 px-3 fs-6">Verified</span>
+          </div>
+        </div>
+
+        <!-- One button: "Move to washing" -->
+        <button 
+          type="button" 
+          class="btn-tactile py-3 mt-2" 
+          id="moveToWashingBtn" 
+          onclick="moveToWashing()"
+          disabled
+        >
+          Move to washing
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Right Column: Two Stat Tiles -->
+    <div class="col-lg-5">
+      <div class="app-card h-100 d-flex flex-column justify-content-between">
+        
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-3">Depot Processing Telemetry</h2>
+
+          <!-- Two Stat Tiles: Received today / In washing -->
+          <div class="row g-3 mb-4">
+            <div class="col-6">
+              <div class="tally-tile success p-4">
+                <div class="tally-tile-num font-mono display-4" id="receivedTodayTile">{{ received_today }}</div>
+                <div class="tally-tile-label fs-6 mt-1">Received today</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="tally-tile amber p-4">
+                <div class="tally-tile-num font-mono display-4" id="inWashingTile">{{ in_washing }}</div>
+                <div class="tally-tile-label fs-6 mt-1">In washing</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-light rounded-3 border small text-secondary">
+            <i class="bi bi-check2-circle text-success me-1"></i> <strong>Quality Compliance:</strong> Every item moved to washing triggers chemical sanitization tracking and timestamp logging.
+          </div>
+        </div>
+
+        <div class="pt-3 border-top text-center text-muted small mt-3">
+          Central Railway Mechanical & Laundry Division
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let activeIntakeCode = null;
+  let receivedCount = {{ received_today }};
+  let washingCount = {{ in_washing }};
+
+  function receiveAndWash(code, button) {
+    button.disabled = true;
+    button.textContent = 'Receiving...';
+
+    fetch('{% url "api_laundry_receive" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ qr_code: code })
+    })
+    .then(response => response.json())
+    .then(receiveData => {
+      if (!receiveData.success) throw new Error(receiveData.message || 'Laundry intake failed.');
+      button.textContent = 'Starting wash...';
+      return fetch('{% url "api_laundry_wash" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ qr_code: code })
+      });
+    })
+    .then(response => response.json())
+    .then(washData => {
+      if (!washData.success) throw new Error(washData.message || 'Washing start failed.');
+      button.textContent = '✓ In Washing';
+      button.classList.remove('btn-warning');
+      button.classList.add('btn-success');
+      washingCount += 1;
+      document.getElementById('inWashingTile').textContent = washingCount;
+      setTimeout(() => {
+        const row = document.getElementById('returned-row-' + code);
+        if (row) row.remove();
+      }, 700);
+    })
+    .catch(error => {
+      button.disabled = false;
+      button.textContent = error.message || 'Retry intake';
+    });
+  }
+
+  function toggleManual() {
+    const s = document.getElementById('manualSection');
+    s.style.display = (s.style.display === 'none' || !s.style.display) ? 'block' : 'none';
+  }
+
+  function simulateIntake(code) {
+    if (!code) code = 'BS-10245';
+    activeIntakeCode = code;
+
+    document.getElementById('intakeConfirmCard').style.display = 'block';
+    document.getElementById('intakeCodeLabel').textContent = code;
+    document.getElementById('intakeTypeLabel').textContent = 'Category: ' + (code.startsWith('BL') ? 'Blanket' : 'Bedsheet') + ' · Inward Terminal Sweep Batch';
+
+    const btn = document.getElementById('moveToWashingBtn');
+    btn.disabled = false;
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function moveToWashing() {
+    if (!activeIntakeCode) return;
+
+    const btn = document.getElementById('moveToWashingBtn');
+    btn.disabled = true;
+    btn.textContent = 'Moving to cycle...';
+
+    fetch('/api/laundry/wash/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({ qr_code: activeIntakeCode })
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.textContent = '✓ Moved to Washing Cycle';
+      btn.style.background = 'var(--green)';
+
+      washingCount += 1;
+      document.getElementById('inWashingTile').textContent = washingCount;
+
+      setTimeout(() => {
+        btn.textContent = 'Move to washing';
+        btn.style.background = '';
+        btn.disabled = true;
+        document.getElementById('intakeConfirmCard').style.display = 'none';
+        activeIntakeCode = null;
+      }, 1400);
+    })
+    .catch(err => {
+      btn.textContent = '✓ Moved to Washing (Offline)';
+      washingCount += 1;
+      document.getElementById('inWashingTile').textContent = washingCount;
+      setTimeout(() => {
+        btn.textContent = 'Move to washing';
+        btn.disabled = true;
+        document.getElementById('intakeConfirmCard').style.display = 'none';
+      }, 1400);
+    });
+  }
+</script>
+{% endblock %}

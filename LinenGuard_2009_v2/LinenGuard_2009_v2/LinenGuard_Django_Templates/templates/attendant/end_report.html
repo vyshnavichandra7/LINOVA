@@ -1,0 +1,119 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Coach Sweep Report - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Breadcrumb -->
+  <div class="d-flex align-items-center justify-content-between mb-1">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'attendant_hub' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-arrow-left"></i> Action Hub
+      </a>
+      <h1 class="h4 fw-bold mb-0 text-dark">End-of-Coach Sweep Report</h1>
+    </div>
+    <div class="text-secondary small font-mono">
+      Train {{ handoff.train.train_number }} · Coach {{ handoff.coach.coach_number }} ({{ handoff.shift }} Shift)
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <!-- Left Column: 4 Stat Tiles & Sweep Submission -->
+    <div class="col-lg-6">
+      <div class="app-card h-100 d-flex flex-column justify-content-between">
+        
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-3">Reconciled Coach Totals</h2>
+
+          <!-- Four color-coded numbers: Expected / Returned / Damaged / Missing -->
+          <div class="row g-3 mb-4">
+            <div class="col-6">
+              <div class="p-3 bg-light rounded-3 border text-center">
+                <div class="display-5 fw-bold mb-0 text-dark font-mono">{{ expected }}</div>
+                <div class="small text-muted fw-bold text-uppercase mt-1" style="font-size: 0.75rem;">Expected</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 rounded-3 text-center" style="background: var(--green-bg); border: 1px solid #c8e8d6;">
+                <div class="display-5 fw-bold mb-0 text-success font-mono">{{ returned }}</div>
+                <div class="small fw-bold text-uppercase mt-1" style="font-size: 0.75rem; color: var(--green);">Returned</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 bg-light rounded-3 border text-center">
+                <div class="display-5 fw-bold mb-0 text-secondary font-mono">{{ damaged }}</div>
+                <div class="small text-muted fw-bold text-uppercase mt-1" style="font-size: 0.75rem;">Damaged</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 rounded-3 text-center" style="background: var(--red-bg); border: 1px solid #f8c9c6;">
+                <div class="display-5 fw-bold mb-0 font-mono" style="color: var(--red);">{{ missing }}</div>
+                <div class="small fw-bold text-uppercase mt-1" style="font-size: 0.75rem; color: var(--red);">Missing</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-light rounded-3 border small text-secondary">
+            <i class="bi bi-shield-check text-success me-1"></i> Submitting this sweep report closes the active shift collection window and forwards discrepancy records to the depot supervisor console.
+          </div>
+        </div>
+
+        <div class="pt-4 border-top mt-4">
+          <button type="button" class="btn-tactile py-3" id="submitSweepBtn" onclick="submitSweepReport()">
+            Submit sweep report
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right Column: Checkpoint Analysis for Missing Items -->
+    <div class="col-lg-6">
+      <div class="app-card h-100">
+        <h2 class="h6 fw-bold text-dark mb-3 d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-geo-alt-fill text-danger me-1"></i> Missing Items Verification Logs</span>
+          <span class="badge bg-danger text-white">{{ missing_reports|length }} Flagged</span>
+        </h2>
+
+        <div class="d-flex flex-column gap-2 overflow-y-auto" style="max-height: 480px;">
+          {% for m in missing_reports %}
+          <div class="p-3 bg-light rounded-3 border">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-bold font-mono text-dark">{{ m.code }}</span>
+              <span class="badge bg-white text-dark border">{{ m.type }}</span>
+            </div>
+            <div class="small text-secondary">
+              Last seen at <strong class="text-dark">{{ m.location }}</strong>, {{ m.time }}
+            </div>
+            <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+              Verified checkpoint stage: {{ m.stage }}
+            </div>
+          </div>
+          {% empty %}
+          <div class="p-4 text-center text-muted small bg-light rounded-3 border">
+            All expected items in Coach {{ handoff.coach.coach_number }} were returned without discrepancy.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function submitSweepReport() {
+    const btn = document.getElementById('submitSweepBtn');
+    btn.textContent = '✓ Sweep Report Submitted';
+    btn.style.background = 'var(--green)';
+    setTimeout(() => {
+      window.location.href = "{% url 'attendant_hub' %}";
+    }, 1200);
+  }
+</script>
+{% endblock %}

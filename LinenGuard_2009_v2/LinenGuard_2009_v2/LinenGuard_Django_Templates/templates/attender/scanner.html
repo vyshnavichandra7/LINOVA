@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}QR Scanner - Train {{ session.train.train_number }} Coach {{ session.coach.coach_number }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <!-- Active Session Bar -->
+    <div class="card bg-navy text-white shadow-sm mb-3">
+      <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="badge bg-warning text-dark me-1"><i class="bi bi-broadcast me-1"></i>ACTIVE COLLECTION</span>
+          <strong>Train {{ session.train.train_number }}</strong> &bull;
+          <strong class="text-warning">Coach {{ session.coach.coach_number }}</strong>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-light text-dark">
+            Scanned: <strong id="stat-scanned-qty" class="text-success">{{ session.scanned_quantity }}</strong> / {{ session.expected_quantity }}
+          </span>
+          <a href="{% url 'complete_collection' session.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Complete this collection sweep now?');">
+            Complete Session
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scanner Card (Sections 16 - 20) -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 text-center">
+        <h4 class="fw-bold mb-0 text-navy">
+          <i class="bi bi-camera me-2 text-primary"></i>SCAN LINEN QR
+        </h4>
+        <div class="text-muted small">Align the QR code on the linen label within the viewfinder</div>
+      </div>
+
+      <div class="card-body p-4">
+
+        <!-- Camera Viewport Area -->
+        <div class="scanner-container mb-3 position-relative">
+          <div id="reader" style="width: 100%;"></div>
+        </div>
+
+        <div id="camera-status" class="text-center mb-3"></div>
+
+        <!-- Manual QR ID Entry Fallback (Section 16 & 43) -->
+        <div class="bg-light p-3 rounded-3 border">
+          <label class="form-label fw-bold text-dark mb-1">
+            <i class="bi bi-keyboard me-1 text-primary"></i> Or Enter Linen QR Manually:
+          </label>
+          <div class="input-group input-group-lg">
+            <input type="text" id="manual-qr-input" class="form-control font-monospace text-uppercase" placeholder="e.g. BL-20561" autocomplete="off">
+            <button class="btn btn-primary px-4 fw-bold" id="btn-manual-search" type="button">
+              <i class="bi bi-search me-1"></i> VERIFY
+            </button>
+          </div>
+
+          <!-- Quick Simulation Controls -->
+          <div class="mt-3 pt-2 border-top text-center">
+            <span class="text-muted small fw-semibold d-block mb-2">Quick Simulation Controls:</span>
+            <div class="btn-group btn-group-sm flex-wrap">
+              <button type="button" class="btn btn-outline-success" onclick="simulateScan('BL-20561')">
+                <i class="bi bi-check-circle me-1"></i>Test Valid: BL-20561
+              </button>
+              <button type="button" class="btn btn-outline-warning" onclick="simulateScan('BS-88001')">
+                <i class="bi bi-exclamation-triangle me-1"></i>Test Laundry: BS-88001
+              </button>
+              <button type="button" class="btn btn-outline-danger" onclick="simulateScan('XYZ-99999')">
+                <i class="bi bi-x-circle me-1"></i>Test Unknown QR
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Scan Result / Verification Modal Area -->
+        <div id="scan-result-container"></div>
+
+      </div>
+    </div>
+
+    <!-- Recent Scans In This Session -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-2 fw-bold small text-muted">
+        <i class="bi bi-list-check me-1"></i>Recent Scans In Current Session
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush small" id="recent-scans-list">
+          {% for scan in recent_scans %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <span class="font-monospace fw-bold">{{ scan.scanned_qr }}</span> &bull;
+              <span class="text-muted">{{ scan.message }}</span>
+            </div>
+            <span class="badge {% if scan.result == 'SUCCESS' %}bg-success{% elif scan.result == 'WRONG_COACH' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+              {{ scan.result }}
+            </span>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted text-center py-3">No scans recorded yet in this session.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/qr_scanner.js"></script>
+<script>
+  let scannerInstance = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    scannerInstance = new LinenQRScanner({
+      sessionId: {{ session.id }},
+      csrfToken: '{{ csrf_token }}',
+      scanApiUrl: '{% url "api_collection_scan" %}',
+      returnApiUrl: '{% url "api_collection_return" %}'
+    });
+
+    scannerInstance.initScanner();
+
+    // Manual input button click
+    const btnManual = document.getElementById('btn-manual-search');
+    const inputManual = document.getElementById('manual-qr-input');
+
+    btnManual.addEventListener('click', function() {
+      const val = inputManual.value.trim();
+      if (val) {
+        scannerInstance.processCode(val);
+      }
+    });
+
+    // Enter key support
+    inputManual.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        const val = inputManual.value.trim();
+        if (val) {
+          scannerInstance.processCode(val);
+        }
+      }
+    });
+  });
+
+  function simulateScan(code) {
+    document.getElementById('manual-qr-input').value = code;
+    if (scannerInstance) {
+      scannerInstance.processCode(code);
+    }
+  }
+</script>
+{% endblock %}

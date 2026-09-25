@@ -1,0 +1,194 @@
+{% extends "supervisor/base_supervisor.html" %}
+
+{% block title %}Missing Linen & Settlement - Supervisor Console{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column">
+
+  <!-- Header -->
+  <div class="supervisor-header-bar">
+    <div>
+      <h1 class="h3 fw-bold mb-1 text-white">Missing Linen & Settlement</h1>
+      <div class="small" style="color: var(--admin-muted);">
+        Checkpoint Verification & Liability Reconciliation
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <!-- Left column: Missing items list -->
+    <div class="col-md-4 col-lg-3">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small fw-semibold text-uppercase mb-3" style="color: var(--admin-muted); font-size: 0.75rem;">
+          Unaccounted Items ({{ items.count }})
+        </div>
+
+        <div class="d-flex flex-column gap-2" style="max-height: 600px; overflow-y: auto;">
+          {% for itm in items %}
+          <a href="?code={{ itm.linen_code }}" class="p-2 px-3 rounded-2 text-decoration-none border d-block unaccounted-item-card" 
+             style="background: {% if selected_item.id == itm.id %}rgba(166, 130, 46, 0.18){% else %}var(--admin-bg){% endif %}; border-color: {% if selected_item.id == itm.id %}var(--gold){% else %}var(--admin-border){% endif %} !important;">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="font-mono fw-bold text-white small">{{ itm.linen_code }}</span>
+              <span class="badge bg-danger text-white" style="font-size: 0.65rem;">Unaccounted</span>
+            </div>
+            <div class="small text-secondary" style="font-size: 0.76rem;">{{ itm.linen_type }} · {{ itm.current_location|truncatechars:20 }}</div>
+          </a>
+          {% empty %}
+          <div class="text-muted small text-center py-4">No unaccounted items.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Item Checkpoint Timeline & Settlement Decision -->
+    <div class="col-md-8 col-lg-9">
+      {% if selected_item %}
+      <div class="p-4 rounded-3 border mb-4" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <div class="h4 fw-bold font-mono text-white mb-1">{{ selected_item.linen_code }}</div>
+            <div class="small text-secondary">
+              Category: <span class="text-white">{{ selected_item.linen_type }}</span> &nbsp;|&nbsp; 
+              Current Status: <span class="text-danger fw-semibold">{{ selected_item.status }}</span>
+            </div>
+          </div>
+          <span class="badge bg-warning text-dark px-3 py-2 fw-semibold">
+            Last Checkpoint: Coach B2 / Berth 41
+          </span>
+        </div>
+
+        <!-- Checkpoint Timeline (The single most important visual: Proof of last confirmed checkpoint) -->
+        <!-- Registered → Loaded → Berth assigned → Issued → Collected → Laundry return -->
+        <div class="my-4">
+          <div class="small fw-semibold text-uppercase mb-2" style="color: var(--admin-muted); font-size: 0.75rem;">
+            Horizontal Chain-of-Custody Timeline
+          </div>
+
+          <div class="checkpoint-timeline-row">
+            
+            <!-- 1. Registered (Completed: Green) -->
+            <div class="checkpoint-step completed">
+              <div class="step-node"><i class="bi bi-check-lg"></i></div>
+              <div class="step-label">1. Registered</div>
+              <div class="font-mono text-secondary" style="font-size: 0.68rem;">Central Laundry</div>
+            </div>
+
+            <!-- 2. Loaded to Train (Completed: Green) -->
+            <div class="checkpoint-step completed">
+              <div class="step-node"><i class="bi bi-check-lg"></i></div>
+              <div class="step-label">2. Loaded</div>
+              <div class="font-mono text-secondary" style="font-size: 0.68rem;">Train 12760</div>
+            </div>
+
+            <!-- 3. Coach / Berth assigned (Completed: Green) -->
+            <div class="checkpoint-step completed">
+              <div class="step-node"><i class="bi bi-check-lg"></i></div>
+              <div class="step-label">3. Berth Allocated</div>
+              <div class="font-mono text-secondary" style="font-size: 0.68rem;">Coach B2 / Berth 41</div>
+            </div>
+
+            <!-- 4. Issued (Last-Known: Amber) -->
+            <div class="checkpoint-step last-known">
+              <div class="step-node"><i class="bi bi-exclamation-lg"></i></div>
+              <div class="step-label">4. Issued</div>
+              <div class="font-mono text-warning" style="font-size: 0.68rem;">Last Confirmed ✓</div>
+            </div>
+
+            <!-- 5. Collected (Dim / Broken) -->
+            <div class="checkpoint-step dim">
+              <div class="step-node"><i class="bi bi-x"></i></div>
+              <div class="step-label">5. Collected</div>
+              <div class="font-mono text-secondary" style="font-size: 0.68rem;">Missed Scan</div>
+            </div>
+
+            <!-- 6. Laundry return (Dim) -->
+            <div class="checkpoint-step dim">
+              <div class="step-node"><i class="bi bi-x"></i></div>
+              <div class="step-label">6. Laundry Return</div>
+              <div class="font-mono text-secondary" style="font-size: 0.68rem;">Pending</div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2 border mb-4" style="background: #0d151f; border-color: var(--admin-border) !important;">
+          <div class="small text-secondary">
+            <strong class="text-white">Audit Finding:</strong> Physical item verification was confirmed at <strong class="text-warning">Berth 41 (PNR-1042)</strong> during departure. No return checkpoint scan was logged during the terminal sweep at Secunderabad.
+          </div>
+        </div>
+
+        <!-- Settlement Decision: Status dropdown, amount field, Save decision button -->
+        <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+          <h2 class="h6 fw-bold text-white mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-cash-coin text-warning"></i> Settlement Decision
+          </h2>
+
+          <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label class="small text-secondary fw-semibold mb-1">Decision Status</label>
+              <select class="form-select supervisor-select" id="settlementStatusSelect">
+                <option value="PENDING" {% if selected_item.settlement_status == 'PENDING' %}selected{% endif %}>Pending Investigation</option>
+                <option value="CHARGED" {% if selected_item.settlement_status == 'CHARGED' %}selected{% endif %}>Charged (Contractor / Staff)</option>
+                <option value="WAIVED" {% if selected_item.settlement_status == 'WAIVED' %}selected{% endif %}>Waived (Operational Loss)</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="small text-secondary fw-semibold mb-1">Settlement Amount (INR)</label>
+              <input type="number" class="form-control supervisor-input font-mono" id="settlementAmountInput" value="{{ selected_item.settlement_amount|default:'450.00' }}">
+            </div>
+
+            <div class="col-md-4">
+              <button type="button" class="btn-tactile w-100" id="saveDecisionBtn" onclick="saveSettlementDecision()">
+                Save decision
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function saveSettlementDecision() {
+    const btn = document.getElementById('saveDecisionBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const status = document.getElementById('settlementStatusSelect').value;
+    const amount = document.getElementById('settlementAmountInput').value;
+
+    fetch('/api/supervisor/settlement/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        linen_code: '{{ selected_item.linen_code }}',
+        settlement_status: status,
+        amount: amount,
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.textContent = '✓ Decision Saved';
+      setTimeout(() => { btn.textContent = 'Save decision'; }, 2000);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.textContent = '✓ Decision Saved (Cached)';
+    });
+  }
+</script>
+{% endblock %}

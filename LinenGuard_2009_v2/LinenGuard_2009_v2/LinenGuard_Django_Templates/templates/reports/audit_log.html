@@ -1,0 +1,126 @@
+{% extends "supervisor/base_supervisor.html" %}
+
+{% block title %}Operational Audit Trail - Supervisor Console{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Header -->
+  <div class="supervisor-header-bar flex-wrap gap-3">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h1 class="h3 fw-bold mb-0 text-white">Operational Audit Trail</h1>
+        <span class="badge bg-dark border text-warning font-mono px-2 py-1">Immutable Log</span>
+      </div>
+      <div class="small" style="color: var(--admin-muted);">
+        Chronological chain-of-custody verification and scan audit stream
+      </div>
+    </div>
+    <div class="px-3 py-2 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+      <span class="text-white fw-bold font-mono">{{ events|length }}</span>
+      <span style="color: var(--admin-muted); font-size: 0.85rem;"> lifecycle events &nbsp;·&nbsp; </span>
+      <span class="text-warning fw-bold font-mono">{{ scans|length }}</span>
+      <span style="color: var(--admin-muted); font-size: 0.85rem;"> checkpoint scans</span>
+    </div>
+  </div>
+
+  <!-- Lifecycle Events Card -->
+  <div class="rounded-3 border overflow-hidden mb-3" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+    <div class="px-3 py-3 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--admin-border) !important;">
+      <div class="fw-bold text-white d-flex align-items-center gap-2">
+        <i class="bi bi-activity text-warning"></i>
+        <span>Linen Lifecycle Events Log</span>
+      </div>
+      <span class="badge bg-dark border text-secondary font-mono">Real-time Stream</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="supervisor-table mb-0">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Staff / Attendant</th>
+            <th>Action / Event</th>
+            <th>Linen Code</th>
+            <th>Location</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in events %}
+          <tr>
+            <td class="font-mono small text-secondary">{{ ev.timestamp|date:"d M Y, H:i:s" }}</td>
+            <td>
+              {% if ev.performed_by %}
+                <span class="badge bg-dark border text-white font-mono"><i class="bi bi-person me-1 text-warning"></i>{{ ev.performed_by.username }}</span>
+              {% else %}
+                <span class="badge bg-secondary font-mono">System Auto</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {% if ev.event_type == 'UNACCOUNTED' %}bg-danger{% elif 'COLLECTED' in ev.event_type or 'RETURNED' in ev.event_type %}bg-success{% elif 'ISSUED' in ev.event_type %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ ev.get_event_type_display }}
+              </span>
+            </td>
+            <td>
+              <span class="font-mono fw-bold text-warning">{{ ev.linen.linen_code }}</span>
+            </td>
+            <td class="small" style="color: var(--admin-muted);">{{ ev.location }}</td>
+            <td class="small text-secondary">{{ ev.notes|truncatechars:70 }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">No audit events recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Scan Attempts Audit Table -->
+  <div class="rounded-3 border overflow-hidden" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+    <div class="px-3 py-3 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--admin-border) !important;">
+      <div class="fw-bold text-white d-flex align-items-center gap-2">
+        <i class="bi bi-qr-code-scan text-primary"></i>
+        <span>Handheld Checkpoint Scan Log</span>
+      </div>
+      <span class="badge bg-dark border text-secondary font-mono">Terminal Scans</span>
+    </div>
+
+    <div class="table-responsive">
+      <table class="supervisor-table mb-0">
+        <thead>
+          <tr>
+            <th>Scan Time</th>
+            <th>Attendant</th>
+            <th>Scanned QR Code</th>
+            <th>Result</th>
+            <th>Validation Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for scan in scans %}
+          <tr>
+            <td class="font-mono small text-secondary">{{ scan.scanned_at|date:"d M Y, H:i:s" }}</td>
+            <td><span class="badge bg-dark border text-white font-mono">{{ scan.scanned_by.username }}</span></td>
+            <td class="font-mono fw-bold text-warning">{{ scan.scanned_qr }}</td>
+            <td>
+              <span class="badge {% if scan.result == 'SUCCESS' %}bg-success text-white{% elif scan.result == 'WRONG_COACH' %}bg-warning text-dark{% else %}bg-danger text-white{% endif %}">
+                {{ scan.result }}
+              </span>
+            </td>
+            <td class="small text-secondary">{{ scan.message }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">No scan attempts recorded.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

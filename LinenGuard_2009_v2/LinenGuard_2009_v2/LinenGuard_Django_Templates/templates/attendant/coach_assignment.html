@@ -1,0 +1,134 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Coach Assignment - LINOVA{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-2">
+  <div class="col-md-10 col-lg-8">
+    
+    <div class="app-card shadow-sm border p-4">
+      
+      <!-- Attendant Profile Bar -->
+      <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-person-badge text-primary fs-4"></i>
+          <div>
+            <div class="fw-bold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
+            <div class="small text-muted font-mono">Employee ID: <span class="text-primary fw-bold">{{ request.user.profile.badge_number|default:"ATT-B2-8821" }}</span></div>
+          </div>
+        </div>
+        <span class="badge bg-success text-white px-2 py-1 font-mono">Assigned by Supervisor</span>
+      </div>
+
+      <!-- 3-step tracker: TRAIN / COACH / SHIFT -->
+      <div class="progress-tracker-3step mb-3">
+        <span class="step-item active">● 1. TRAIN ASSIGNED</span>
+        <span class="step-item active">● 2. COACH ALLOCATED</span>
+        <span class="step-item">○ 3. SHIFT INITIATION</span>
+      </div>
+
+      <!-- Coach Assignment Card -->
+      <div class="coach-assigned-card mb-4">
+        <div class="coach-assigned-info">
+          <!-- Split-Flap Board for Train Number -->
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <span class="small fw-semibold text-muted">Train:</span>
+            <div class="split-flap-board" aria-label="Train {{ handoff.train.train_number }}">
+              {% for ch in train_chars %}
+              <span class="split-flap-cell">{{ ch }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          
+          <div class="coach-assigned-subtext fs-6 mt-3">
+            <strong>Coach {{ handoff.coach.coach_number }}</strong> &nbsp;·&nbsp; {{ handoff.shift }} shift &nbsp;·&nbsp; <strong class="text-primary font-mono">{{ handoff.bedsheets_handed_over }} bedsheets</strong> handed over
+          </div>
+
+          <div class="small text-muted mt-1">
+            Route: {{ handoff.train.source }} ➔ {{ handoff.train.destination }}
+          </div>
+
+          {% if passengers %}
+          <div class="small text-success fw-semibold mt-2">
+            <i class="bi bi-people-fill me-1"></i> {{ passengers|length }} passengers registered in Coach {{ handoff.coach.coach_number }} ready for linen issuance.
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Blue Checkmark -->
+        <div class="coach-assigned-check ms-4">
+          <i class="bi bi-check-circle-fill text-primary display-5"></i>
+        </div>
+      </div>
+
+      <!-- Form to Confirm & Start Shift -->
+      <form method="POST" action="{% url 'attendant_assignment' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-tactile py-3" id="confirmShiftBtn">
+          Confirm Duty & Start Shift (Coach {{ handoff.coach.coach_number }})
+        </button>
+      </form>
+
+      <!-- Coach Passenger Roster List -->
+      {% if passengers %}
+      <div class="mt-4 pt-3 border-top">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-people-fill text-primary"></i>
+            <h3 class="h6 fw-bold mb-0 text-dark">
+              Coach {{ handoff.coach.coach_number }} Passenger Roster ({{ passengers|length }} Booked)
+            </h3>
+          </div>
+          <a href="{% url 'attendant_roster' %}" class="btn btn-sm btn-outline-primary py-1 px-2 font-mono" style="font-size: 0.75rem;">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Full Roster Chart
+          </a>
+        </div>
+
+        <div class="table-responsive border rounded-3 bg-white mb-2">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light">
+              <tr class="text-secondary text-uppercase" style="font-size: 0.72rem;">
+                <th>Berth</th>
+                <th>Passenger</th>
+                <th>PNR</th>
+                <th>Destination</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in passengers %}
+              <tr>
+                <td>
+                  <span class="badge bg-primary font-mono">B{{ p.berth }}</span>
+                  <span class="text-muted small ms-1">{{ p.berth_type }}</span>
+                </td>
+                <td>
+                  <strong class="text-dark">{{ p.passenger_name }}</strong>
+                  {% if p.passenger_age or p.passenger_gender %}
+                    <span class="text-muted small font-mono">({{ p.passenger_gender|default:"-" }}/{{ p.passenger_age|default:"-" }})</span>
+                  {% endif %}
+                </td>
+                <td class="font-mono">{{ p.masked_pnr }}</td>
+                <td>{{ p.destination_station }}</td>
+                <td>
+                  {% if p.status == 'Issued' %}
+                    <span class="badge bg-success font-mono">Issued</span>
+                  {% elif p.status == 'Boarding now' %}
+                    <span class="badge bg-warning text-dark font-mono">Boarding</span>
+                  {% else %}
+                    <span class="badge bg-secondary font-mono">{{ p.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}

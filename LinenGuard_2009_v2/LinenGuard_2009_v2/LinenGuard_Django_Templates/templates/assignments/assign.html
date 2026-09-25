@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Issue Linen via PNR - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3 class="fw-bold mb-0 text-navy">
+          <i class="bi bi-ticket-perforated text-primary me-2"></i>ISSUE LINEN VIA PASSENGER PNR
+        </h3>
+        <p class="text-muted small mb-0">Automatic retrieval of Train, Coach, Berth, Origin & Destination from Passenger PNR</p>
+      </div>
+      <a href="{% url 'assignments_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-list-check me-1"></i>Active Assignments
+      </a>
+    </div>
+
+    <!-- PNR Assignment Form Card -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <form method="POST" id="pnr-assignment-form">
+          {% csrf_token %}
+          
+          <div class="row g-3">
+            
+            <!-- Step 1: PNR Number Input -->
+            <div class="col-md-7">
+              <label class="form-label fw-bold text-dark">
+                <i class="bi bi-person-vcard text-primary me-1"></i> 1. Passenger PNR Number
+              </label>
+              <div class="input-group input-group-lg">
+                <input type="text" name="passenger_reference" id="pnr-input" class="form-control font-monospace text-uppercase fw-bold" placeholder="e.g. PNR-1001 or 2418901234" value="{{ pre_pnr }}" required autocomplete="off">
+                <button type="button" class="btn btn-primary px-3 fw-bold" id="btn-fetch-pnr">
+                  <i class="bi bi-search me-1"></i> Fetch
+                </button>
+              </div>
+              <div class="form-text small">Train, Coach, Berth, Origin, and Destination are retrieved automatically.</div>
+            </div>
+
+            <!-- Step 2: Linen Code / QR Input -->
+            <div class="col-md-5">
+              <label class="form-label fw-bold text-dark">
+                <i class="bi bi-qr-code-scan text-success me-1"></i> 2. Linen ID / QR Code
+              </label>
+              <input type="text" name="linen_code" id="linen-code-input" class="form-control form-control-lg font-monospace text-uppercase fw-bold" placeholder="e.g. BL-20561" value="{{ pre_code }}" required>
+              <div class="form-text small">Scan QR or enter item code.</div>
+            </div>
+
+            <!-- Quick Demo PNR Shortcuts -->
+            <div class="col-12 mt-2">
+              <span class="text-muted small fw-semibold me-2">Sample PNRs:</span>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setPnrAndFetch('PNR-1001', 'BL-20561')">
+                  PNR-1001 (Berth 36)
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setPnrAndFetch('PNR-1042', 'BL-20562')">
+                  PNR-1042 (Berth 41)
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setPnrAndFetch('2418901234', '')">
+                  2418901234 (10-Digit PNR)
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Passenger Journey Information Card -->
+            <div class="col-12 mt-3" id="pnr-details-section" style="display: none;">
+              <div class="card border-primary bg-light shadow-sm">
+                <div class="card-header bg-navy text-white d-flex justify-content-between align-items-center py-2 px-3">
+                  <span class="fw-bold"><i class="bi bi-check-circle-fill text-success me-2"></i>Passenger Booking Details Retrieved</span>
+                  <span class="badge bg-warning text-dark font-monospace fw-bold" id="card-pnr-badge">PNR-1001</span>
+                </div>
+                <div class="card-body p-3">
+                  <div class="row g-3 text-center">
+                    
+                    <div class="col-md-3 col-6 text-md-start">
+                      <span class="text-muted small d-block">Train Number & Name</span>
+                      <strong class="fs-6 text-dark" id="card-train">12760 - Demo Express</strong>
+                    </div>
+
+                    <div class="col-md-3 col-6 text-md-start">
+                      <span class="text-muted small d-block">Route (Journey Path)</span>
+                      <strong class="fs-6 text-primary" id="card-route">NDLS ➔ HYB</strong>
+                    </div>
+
+                    <div class="col-md-3 col-6 text-md-start">
+                      <span class="text-muted small d-block">Coach & Berth Allocation</span>
+                      <div class="d-flex align-items-center gap-1">
+                        <span class="badge bg-primary fs-6" id="card-coach">Coach B2</span>
+                        <span class="badge bg-success fs-6" id="card-berth">Berth 36</span>
+                      </div>
+                      <span class="text-muted extra-small d-block" id="card-berth-type">Lower Berth</span>
+                    </div>
+
+                    <div class="col-md-3 col-6 text-md-start">
+                      <span class="text-muted small d-block">Timings & Expected Collection</span>
+                      <span class="small fw-semibold text-dark d-block">Arr: <strong id="card-arr-time">06:30 AM</strong></span>
+                      <span class="badge bg-light text-muted border" id="card-status">CNF / Confirmed</span>
+                    </div>
+
+                    <div class="col-md-6 text-md-start">
+                      <span class="text-muted small d-block">Passenger</span>
+                      <strong class="fs-6 text-dark" id="card-passenger">Passenger details not entered</strong>
+                      <span class="small text-muted d-block" id="card-passenger-meta"></span>
+                    </div>
+
+                    <div class="col-md-6 text-md-start">
+                      <span class="text-muted small d-block">Digital passenger ticket</span>
+                      <img id="card-ticket-image" class="d-none mt-1 rounded border w-100" style="max-height: 170px; object-fit: contain;" alt="Passenger ticket">
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="col-12 mt-4">
+              <button type="submit" class="btn btn-success btn-lg w-100 shadow fw-bold py-3">
+                <i class="bi bi-check2-circle me-2"></i> ISSUE LINEN TO PASSENGER
+              </button>
+            </div>
+
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const pnrInput = document.getElementById('pnr-input');
+    const btnFetch = document.getElementById('btn-fetch-pnr');
+
+    btnFetch.addEventListener('click', function() {
+      fetchPnrDetails(pnrInput.value.trim());
+    });
+
+    pnrInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        fetchPnrDetails(pnrInput.value.trim());
+      }
+    });
+
+    // Auto-fetch if PNR is pre-filled
+    if (pnrInput.value.trim()) {
+      fetchPnrDetails(pnrInput.value.trim());
+    }
+  });
+
+  function setPnrAndFetch(pnr, code) {
+    document.getElementById('pnr-input').value = pnr;
+    if (code) {
+      document.getElementById('linen-code-input').value = code;
+    }
+    fetchPnrDetails(pnr);
+  }
+
+  function fetchPnrDetails(pnr) {
+    if (!pnr) return;
+    const section = document.getElementById('pnr-details-section');
+
+    fetch(`/api/pnr/${encodeURIComponent(pnr)}/`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.pnr) {
+          const p = data.pnr;
+          document.getElementById('card-pnr-badge').textContent = p.pnr_number;
+          document.getElementById('card-train').textContent = `${p.train_number} - ${p.train_name}`;
+          document.getElementById('card-route').textContent = `${p.source_station} ➔ ${p.destination_station}`;
+          document.getElementById('card-coach').textContent = `Coach ${p.coach_number}`;
+          document.getElementById('card-berth').textContent = `Berth ${p.berth}`;
+          document.getElementById('card-berth-type').textContent = p.berth_type || 'Confirmed Berth';
+          document.getElementById('card-arr-time').textContent = p.expected_arrival_time || '06:30 AM';
+          document.getElementById('card-status').textContent = p.status || 'CNF';
+
+          const passengerSummary = document.getElementById('card-passenger');
+          if (passengerSummary) {
+            passengerSummary.textContent = p.passenger_name || p.passenger_label || 'Passenger details not entered';
+          }
+          const passengerMeta = document.getElementById('card-passenger-meta');
+          if (passengerMeta) {
+            const details = [p.passenger_age ? `${p.passenger_age} years` : '', p.passenger_gender, p.passenger_phone, p.passenger_email]
+              .filter(Boolean).join(' | ');
+            passengerMeta.textContent = details || 'Contact details not entered';
+          }
+
+          const ticketImage = document.getElementById('card-ticket-image');
+          if (ticketImage) {
+            ticketImage.src = p.ticket_image_url || '';
+            ticketImage.classList.toggle('d-none', !p.ticket_image_url);
+          }
+
+          section.style.display = 'block';
+          section.classList.add('animate__animated', 'animate__fadeIn');
+        }
+      })
+      .catch(err => {
+        console.warn("PNR lookup error:", err);
+      });
+  }
+</script>
+{% endblock %}

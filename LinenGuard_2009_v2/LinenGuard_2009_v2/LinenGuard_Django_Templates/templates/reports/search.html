@@ -1,0 +1,104 @@
+{% extends "supervisor/base_supervisor.html" %}
+
+{% block title %}Global Linen Search - Supervisor Console{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Header -->
+  <div class="supervisor-header-bar flex-wrap gap-3">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h1 class="h3 fw-bold mb-0 text-white">Global Linen Search</h1>
+        <span class="badge bg-dark border text-warning font-mono px-2 py-1">Fast Lookup</span>
+      </div>
+      <div class="small" style="color: var(--admin-muted);">
+        Unified traceability query by Linen Code, QR ID, Train, Coach, Berth, or Status
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Card -->
+  <div class="p-4 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+    <form method="GET" action="{% url 'global_search' %}">
+      <div class="d-flex gap-2">
+        <input 
+          type="text" 
+          name="q" 
+          class="form-control font-mono bg-dark text-white border-secondary" 
+          style="border-color: #293a4c !important;"
+          placeholder="Enter Linen Code (BL-20561, MFG-BS-90214), Train (12760), Coach (B2), Berth..." 
+          value="{{ query }}"
+        >
+        <button class="btn btn-primary px-4 fw-bold d-inline-flex align-items-center gap-2" type="submit">
+          <i class="bi bi-search"></i> Search
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if query %}
+  <div class="d-flex justify-content-between align-items-center mt-2">
+    <h2 class="h6 fw-bold text-white mb-0">Search Results for "<span class="text-warning font-mono">{{ query }}</span>" ({{ results|length }} found):</h2>
+  </div>
+
+  <div class="rounded-3 border overflow-hidden" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+    <div class="table-responsive">
+      <table class="supervisor-table mb-0">
+        <thead>
+          <tr>
+            <th>Linen Code</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Train</th>
+            <th>Coach</th>
+            <th>Berth</th>
+            <th>Last Verified Checkpoint</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in results %}
+          {% with checkpoint=item.get_last_verified_checkpoint assignment=item.latest_assignment %}
+          <tr>
+            <td class="font-mono fw-bold text-warning">
+              <a href="{% url 'linen_detail' item.linen_code %}" class="text-warning text-decoration-none">
+                {{ item.linen_code }}
+              </a>
+            </td>
+            <td><span class="badge bg-dark border text-white font-mono">{{ item.linen_type }}</span></td>
+            <td>
+              <span class="badge {% if item.status == 'UNACCOUNTED' %}bg-danger text-white{% elif item.status == 'RETURNED' %}bg-success text-white{% elif item.status == 'ISSUED' %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}">
+                {{ item.get_status_display }}
+              </span>
+            </td>
+            <td class="font-mono text-white">{{ assignment.train.train_number|default:"—" }}</td>
+            <td><span class="badge bg-dark border text-white font-mono">{{ assignment.coach.coach_number|default:"—" }}</span></td>
+            <td class="fw-bold font-mono text-white">{{ assignment.berth|default:"—" }}</td>
+            <td class="small">
+              <strong class="text-white">{{ checkpoint.stage }}</strong> &bull;
+              <span style="color: var(--admin-muted);">{{ checkpoint.location }}</span>
+            </td>
+            <td>
+              <a href="{% url 'linen_detail' item.linen_code %}" class="btn btn-sm btn-outline-warning py-0">
+                <i class="bi bi-clock-history me-1"></i> Timeline
+              </a>
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-search fs-1 d-block mb-2"></i>
+              No linen matching "{{ query }}" found in the system.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

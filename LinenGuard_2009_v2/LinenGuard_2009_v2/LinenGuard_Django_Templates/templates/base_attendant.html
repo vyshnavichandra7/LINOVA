@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}LinenGuard{% endblock %} - Indian Railways Linen Operations</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Railway Instrumentation Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+  
+  <!-- HTML5 QR Code Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- Multi-Theme Engine Script -->
+  <script src="/static/js/theme.js"></script>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="app-viewport">
+
+  <!-- Professional Top Railway App Navbar -->
+  <header class="app-navbar">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{% if user.profile.get_normalized_role == 'LAUNDRY' %}{% url 'laundry_register' %}{% elif user.profile.get_normalized_role == 'SUPERVISOR' %}{% url 'supervisor_handoff' %}{% else %}{% url 'attendant_hub' %}{% endif %}" class="app-brand">
+        <img src="/static/img/logo.jpeg" alt="LINOVA Logo" style="height: 38px; width: auto; object-fit: contain; border-radius: 6px; background: #ffffff; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+        <div>
+          <div class="app-brand-title">LINOVA</div>
+          <div class="app-brand-sub">Indian Railways · Linen Operations</div>
+        </div>
+      </a>
+
+      {% block navbar_center %}{% endblock %}
+    </div>
+
+    <!-- Right Controls: Train/Coach, Theme Toggle, Language, Offline Pill, User Profile -->
+    <div class="d-flex align-items-center gap-2 gap-md-3">
+      
+      {% if handoff %}
+      <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-dark bg-opacity-25 border border-white border-opacity-10 text-white font-mono small">
+        <i class="bi bi-train-front text-warning"></i>
+        <span>Train {{ handoff.train.train_number }}</span>
+        <span class="text-white-50">·</span>
+        <span>Coach {{ handoff.coach.coach_number }}</span>
+      </div>
+
+      {% if user.profile.get_normalized_role == 'ATTENDANT' %}
+      <!-- Passenger Roster Link Pill -->
+      <a href="{% url 'attendant_roster' %}" class="btn btn-sm btn-outline-light border-white border-opacity-25 d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill" title="View Coach {{ handoff.coach.coach_number }} Passenger Roster">
+        <i class="bi bi-people-fill text-warning"></i>
+        <span class="font-mono small fw-bold">Coach {{ handoff.coach.coach_number }} Roster</span>
+      </a>
+
+      <!-- Deboarding in Next 20 Mins Alert Pill -->
+      <a href="{% url 'attendant_alert' %}" class="deboard-top-pill text-decoration-none d-flex align-items-center gap-2 px-3 py-1 rounded-pill shadow-sm" title="Passengers deboarding in next 20 mins — Click to view">
+        <span class="deboard-pulse-dot"></span>
+        <span class="font-mono small fw-bold">Deboarding: {{ deboarding_count|default_if_none:0 }} in 18m</span>
+      </a>
+      {% endif %}
+      {% endif %}
+
+      <!-- Universal Theme Toggle (Dark / Light Mode) -->
+      <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
+        <i class="bi bi-moon-stars-fill theme-toggle-icon"></i>
+        <span class="theme-toggle-text">Dark</span>
+      </button>
+
+      <!-- Language Selector EN / हिं / తె -->
+      <div class="lang-switch" role="group" aria-label="Language selector">
+        <button type="button" class="lang-btn active" id="lang-en" onclick="selectLang('en')">EN</button>
+        <button type="button" class="lang-btn" id="lang-hi" onclick="selectLang('hi')">हिं</button>
+        <button type="button" class="lang-btn" id="lang-te" onclick="selectLang('te')">తె</button>
+      </div>
+
+      <!-- Persistent Connectivity Pill with LED Glow -->
+      <button type="button" class="connectivity-pill offline border-0 shadow-sm" id="global-connectivity-pill" onclick="toggleConnectivity()" title="Click to toggle offline / online demo state">
+        <span class="led-dot"></span>
+        <span id="connectivity-pill-text">Working offline — will sync</span>
+      </button>
+
+      {% if user.is_authenticated %}
+      <div class="d-flex align-items-center gap-2 ms-2">
+        <span class="badge bg-light text-dark py-2 px-2 rounded-2 d-none d-sm-inline-flex align-items-center gap-1">
+          <i class="bi bi-person-fill text-primary"></i>
+          <span class="fw-semibold">{{ user.username|title }}</span>
+          <span class="badge {% if user.profile.get_normalized_role == 'LAUNDRY' %}bg-info text-dark{% else %}bg-primary text-white{% endif %} ms-1">
+            {{ user.profile.get_normalized_role|default:"Staff" }}
+          </span>
+        </span>
+        <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-light border-white border-opacity-25" title="Sign out">
+          <i class="bi bi-box-arrow-right"></i>
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    {% if messages %}
+    <div class="mb-4">
+      {% for message in messages %}
+      <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %} py-2 px-3 small rounded-3 mb-2 shadow-sm" role="alert">
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Professional Footer -->
+  <footer class="app-footer">
+    <div>
+      <strong>LinenGuard Traceability Platform</strong> · Northern & South Central Railway Division
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      <span class="d-inline-flex align-items-center gap-1">
+        <span class="led-dot" style="color: var(--green);"></span> Systems Operational
+      </span>
+      <span>Terminal Checkpoint Hub v4.2</span>
+    </div>
+  </footer>
+
+  <!-- Translation Engine (English, Hindi, Telugu) -->
+  <script src="/static/js/translations.js"></script>
+
+  <script>
+    let isOffline = true;
+    function toggleConnectivity() {
+      isOffline = !isOffline;
+      const pill = document.getElementById('global-connectivity-pill');
+      const text = document.getElementById('connectivity-pill-text');
+      if (!pill) return;
+      if (isOffline) {
+        pill.className = 'connectivity-pill offline border-0 shadow-sm';
+        text.textContent = 'Working offline — will sync';
+      } else {
+        pill.className = 'connectivity-pill online border-0 shadow-sm';
+        text.textContent = 'Connected';
+      }
+      if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations();
+      }
+    }
+  </script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,500 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Manufacturer Linen Intake - Laundry Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Header & Tab Navigation -->
+  <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2">
+        <h1 class="h4 fw-bold mb-0 text-dark">Manufacturer Linen Intake</h1>
+        <span class="badge bg-success text-white font-mono px-2 py-1">Depot Intake Hub</span>
+      </div>
+      <div class="text-secondary small">Scan manufacturer-attached QR codes directly into depot inventory</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'laundry_register' %}" class="btn btn-primary d-inline-flex align-items-center gap-1 shadow-sm">
+        <i class="bi bi-qr-code-scan"></i> Intake Scan (Register)
+      </a>
+      <a href="{% url 'laundry_intake' %}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-arrow-repeat"></i> Washing Intake
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <!-- Left Column: Manufacturer QR Scanner & Category Selection -->
+    <div class="col-lg-7">
+      <div class="app-card">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h2 class="h6 fw-bold text-dark mb-0">Generate & Register Linen IDs</h2>
+            <div class="small text-secondary">Generated IDs are immediately available in the Attender Login for passenger issuance</div>
+          </div>
+          <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono">
+            <i class="bi bi-broadcast me-1"></i> Syncs to Attenders
+          </span>
+        </div>
+
+        <!-- Linen Type Selector (Segmented buttons - NO native <select>) -->
+        <label class="rail-input-label mb-2">Item Category</label>
+        <div class="segmented-selector mb-3" role="radiogroup" aria-label="Linen type selector">
+          <div class="segmented-option-btn active py-2 fs-6" id="opt-bedsheet" onclick="selectType('Bedsheet')">
+            <i class="bi bi-layers d-block fs-5 mb-1"></i> Bedsheet
+          </div>
+          <div class="segmented-option-btn py-2 fs-6" id="opt-blanket" onclick="selectType('Blanket')">
+            <i class="bi bi-cloud-haze2 d-block fs-5 mb-1"></i> Blanket
+          </div>
+          <div class="segmented-option-btn py-2 fs-6" id="opt-towel" onclick="selectType('Towel')">
+            <i class="bi bi-water d-block fs-5 mb-1"></i> Towel
+          </div>
+          <div class="segmented-option-btn py-2 fs-6" id="opt-pillow" onclick="selectType('Pillow Cover')">
+            <i class="bi bi-square d-block fs-5 mb-1"></i> Pillow Cover
+          </div>
+        </div>
+
+        <!-- 1-CLICK GENERATOR BUTTONS (DIRECT ID GENERATION) -->
+        <div class="p-3 bg-white rounded-3 border mb-3 shadow-xs" style="border-left: 4px solid var(--primary, #0c2340) !important;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small fw-bold text-dark text-uppercase" style="font-size: 0.76rem; letter-spacing: 0.5px;">
+              <i class="bi bi-magic text-primary me-1"></i> Quick ID Generators for Train Attendants
+            </span>
+            <span class="badge bg-primary text-white font-mono" style="font-size: 0.7rem;">Direct Issuance Ready</span>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-sm-6">
+              <button type="button" class="btn btn-primary w-100 py-2 d-inline-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm" id="btnGenSingle" onclick="generateLinenDirect(currentType, 1)">
+                <i class="bi bi-plus-circle-fill"></i> Generate 1 <span id="lblGenType">Bedsheet</span> ID
+              </button>
+            </div>
+            <div class="col-sm-6">
+              <button type="button" class="btn btn-dark w-100 py-2 d-inline-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm" id="btnGenKit" onclick="generateLinenDirect('KIT', 1)">
+                <i class="bi bi-collection-fill text-warning"></i> Generate 1 Complete Set (4 Items)
+              </button>
+            </div>
+            <div class="col-12 mt-1">
+              <div class="d-flex justify-content-between align-items-center gap-2 pt-1">
+                <span class="small text-muted" style="font-size: 0.75rem;">
+                  <i class="bi bi-info-circle me-1"></i>Generates standard railway QR codes ready for coach staff to issue directly.
+                </span>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-secondary font-mono bg-light py-1 px-2" onclick="generateLinenDirect(currentType, 5)">
+                    +5 <span id="lblGenBatchType">Bedsheets</span>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary font-mono bg-light py-1 px-2" onclick="generateLinenDirect(currentType, 10)">
+                    +10 <span id="lblGenBatchType10">Bedsheets</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center my-3">
+          <hr class="flex-grow-1 my-0 text-muted">
+          <span class="px-2 text-muted small text-uppercase fw-semibold" style="font-size: 0.72rem;">or Scan / Input Manufacturer Tag</span>
+          <hr class="flex-grow-1 my-0 text-muted">
+        </div>
+
+        <!-- Scan action triggers -->
+        <div class="d-flex gap-2 mb-3">
+          <button type="button" class="btn btn-outline-primary d-inline-flex align-items-center justify-content-center gap-2 flex-grow-1 py-2 fw-semibold bg-white" onclick="toggleCameraScanner()">
+            <i class="bi bi-camera-fill fs-5"></i> Use Camera Barcode / QR Scanner
+          </button>
+        </div>
+
+        <!-- Interactive Scanner Target Area -->
+        <div id="laundryScannerBox" class="scan-target-box mb-3" style="display: none; height: 210px;">
+          <div class="scan-corner tl"></div>
+          <div class="scan-corner tr"></div>
+          <div class="scan-corner bl"></div>
+          <div class="scan-corner br"></div>
+          <div class="scan-laser-line"></div>
+          <div id="laundryCameraFeed" style="width: 100%; height: 100%;"></div>
+          <div class="position-absolute text-white-50 small d-flex flex-column align-items-center" id="scanPromptText">
+            <i class="bi bi-qr-code fs-2 text-warning mb-1"></i>
+            <span>Point camera at manufacturer linen QR code</span>
+          </div>
+        </div>
+
+        <!-- Direct Manufacturer QR Code Input / Barcode Scanner Field -->
+        <div class="p-3 bg-light rounded-3 border mb-3">
+          <label class="rail-input-label mb-1">Manufacturer Attached QR Code / Barcode</label>
+          <div class="d-flex gap-2">
+            <input 
+              type="text" 
+              id="mfgQrInput" 
+              class="rail-input font-mono" 
+              placeholder="e.g. MFG-BS-90214" 
+              value="{{ sample_qr|default:'MFG-BS-90214' }}"
+              onkeydown="if(event.key==='Enter'){ event.preventDefault(); registerScannedManufacturerItem(); }"
+            >
+            <button type="button" class="btn btn-dark fw-bold px-3 d-inline-flex align-items-center gap-1" onclick="registerScannedManufacturerItem()">
+              <i class="bi bi-plus-circle"></i> Register
+            </button>
+          </div>
+          <div class="small text-muted mt-2">
+            <i class="bi bi-info-circle me-1"></i> Supports physical barcode gun scanner, mobile camera scanner, or manual code entry.
+          </div>
+        </div>
+
+        <!-- Sample Manufacturer Tags (For 1-tap fast testing) -->
+        <div class="mb-3">
+          <div class="small fw-semibold text-secondary text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+            Quick-Scan Sample Factory QR Tags:
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            {% for sc in sample_codes %}
+            <button 
+              type="button" 
+              class="btn btn-sm btn-outline-secondary font-mono bg-white d-inline-flex align-items-center gap-1"
+              onclick="setAndRegister('{{ sc.code }}', '{{ sc.type }}')"
+            >
+              <i class="bi bi-tag text-warning"></i> {{ sc.code }} ({{ sc.type }})
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Big Primary Action Button: "Scan & Add to Inventory" -->
+        <button type="button" class="btn-tactile py-3" id="registerPrintBtn" onclick="registerScannedManufacturerItem()">
+          <i class="bi bi-box-seam me-2"></i> Register Scanned Tag to Inventory
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Right Column: Registration Status, Scanned Card & Inventory Stock -->
+    <div class="col-lg-5">
+      <div class="app-card h-100 d-flex flex-column justify-content-between">
+        
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-3">Inventory Readiness</h2>
+
+          <!-- Status tiles: Registered today & Total available -->
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <div class="p-3 rounded-3 text-center border" style="background: #f0f7ff; border-color: #cde2f8 !important;">
+                <div class="display-6 fw-bold text-primary font-mono" id="todayRegisteredCount">{{ today_count|default:"28" }}</div>
+                <div class="small text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Registered Today</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 rounded-3 text-center border" style="background: #f0fdf4; border-color: #bbf7d0 !important;">
+                <div class="display-6 fw-bold text-success font-mono" id="totalInventoryCount">{{ total_inventory|default:"45" }}</div>
+                <div class="small text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">In Depot Inventory</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Generated QR Label Confirmation Card -->
+          <div id="qrResultCard" class="p-3 bg-white rounded-3 border text-center shadow-sm mb-3" style="border-color: var(--green) !important; background: #fafffb !important;">
+            <div class="fw-bold text-success mb-1" id="qrResultMsg">
+              <i class="bi bi-check-circle-fill me-1"></i> Linen Added to Inventory
+            </div>
+            <div class="font-mono fw-bold text-dark fs-5 mb-1" id="qrResultCode">
+              {{ sample_qr|default:"MFG-BS-90214" }}
+            </div>
+            <div class="small text-muted" id="qrResultSub">
+              Status: <span class="badge bg-success">Ready for Coach Issue</span>
+            </div>
+          </div>
+
+          <!-- Recently Registered Manufacturer Items Table -->
+          <div class="border rounded-3 p-3 bg-light">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small fw-bold text-secondary text-uppercase" style="font-size: 0.74rem;">Recent Factory Scans</span>
+              <span class="badge bg-dark text-white font-mono" style="font-size: 0.7rem;">Stock Verified</span>
+            </div>
+            <div class="table-responsive" style="max-height: 240px; overflow-y: auto;">
+              <table class="table table-sm table-borderless small mb-0">
+                <thead>
+                  <tr class="text-muted border-bottom" style="font-size: 0.75rem;">
+                    <th>Linen QR</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="recentScansTableBody">
+                  {% for item in recent_items %}
+                  <tr class="border-bottom">
+                    <td class="font-mono fw-bold text-dark">{{ item.linen_code }}</td>
+                    <td>{{ item.linen_type }}</td>
+                    <td><span class="badge bg-success text-white" style="font-size: 0.68rem;">Ready</span></td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-muted text-center py-2">No factory scans yet.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RBAC Assurance Footer -->
+        <div class="pt-3 border-top text-center text-muted small mt-3">
+          <i class="bi bi-shield-check text-success me-1"></i>
+          <strong>Attendant Gatekeeping Enforced:</strong> Attendants can only issue linen items that exist in this depot inventory.
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<input type="hidden" id="selectedLinenType" value="Bedsheet">
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let currentType = 'Bedsheet';
+  const manufacturerPrefixMap = {
+    'Bedsheet': 'MFG-BS-',
+    'Blanket': 'MFG-BL-',
+    'Towel': 'MFG-TW-',
+    'Pillow Cover': 'MFG-PC-'
+  };
+
+  function selectType(t) {
+    currentType = t;
+    document.getElementById('selectedLinenType').value = t;
+
+    document.querySelectorAll('.segmented-option-btn').forEach(btn => btn.classList.remove('active'));
+    if (t === 'Bedsheet') document.getElementById('opt-bedsheet').classList.add('active');
+    if (t === 'Blanket') document.getElementById('opt-blanket').classList.add('active');
+    if (t === 'Towel') document.getElementById('opt-towel').classList.add('active');
+    if (t === 'Pillow Cover') document.getElementById('opt-pillow').classList.add('active');
+
+    // Update button dynamic labels
+    const lblSingle = document.getElementById('lblGenType');
+    if (lblSingle) lblSingle.textContent = t;
+    const lblBatch5 = document.getElementById('lblGenBatchType');
+    if (lblBatch5) lblBatch5.textContent = t + (t.endsWith('s') ? '' : 's');
+    const lblBatch10 = document.getElementById('lblGenBatchType10');
+    if (lblBatch10) lblBatch10.textContent = t + (t.endsWith('s') ? '' : 's');
+
+    const codeInput = document.getElementById('mfgQrInput');
+    const prefix = manufacturerPrefixMap[t] || manufacturerPrefixMap['Bedsheet'];
+    if (codeInput) {
+      const currentCode = codeInput.value.trim().toUpperCase();
+      const hasManufacturerPrefix = Object.values(manufacturerPrefixMap).some(itemPrefix => currentCode.startsWith(itemPrefix));
+      if (!currentCode || hasManufacturerPrefix) {
+        codeInput.value = prefix;
+        codeInput.focus();
+        codeInput.setSelectionRange(codeInput.value.length, codeInput.value.length);
+      }
+      codeInput.placeholder = `${prefix}90214`;
+    }
+  }
+
+  function generateLinenDirect(lType, count = 1) {
+    const isKit = (lType === 'KIT');
+    const targetType = isKit ? 'KIT' : (lType || currentType);
+    const btnSingle = document.getElementById('btnGenSingle');
+    const btnKit = document.getElementById('btnGenKit');
+    const targetBtn = isKit ? btnKit : btnSingle;
+    const originalText = targetBtn ? targetBtn.innerHTML : '';
+
+    if (targetBtn) {
+      targetBtn.disabled = true;
+      targetBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Generating IDs...';
+    }
+
+    fetch('/api/laundry/generate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        linen_type: targetType,
+        count: count
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (targetBtn) {
+        targetBtn.disabled = false;
+        targetBtn.innerHTML = originalText;
+      }
+
+      if (data.success && data.items && data.items.length) {
+        const firstItem = data.items[0];
+        const card = document.getElementById('qrResultCard');
+        if (card) {
+          card.style.display = 'block';
+          document.getElementById('qrResultMsg').innerHTML = `<i class="bi bi-check-circle-fill me-1 text-success"></i> ${data.message}`;
+          
+          if (data.items.length === 1) {
+            document.getElementById('qrResultCode').textContent = `${firstItem.linen_code} (${firstItem.linen_type})`;
+          } else {
+            const codesSummary = data.items.map(it => it.linen_code).join(', ');
+            document.getElementById('qrResultCode').textContent = `${data.items.length} IDs: ${codesSummary}`;
+          }
+          
+          document.getElementById('qrResultSub').innerHTML = `
+            Status: <span class="badge bg-success">Ready for Train Attendants</span> 
+            <span class="text-muted ms-1 small">· Visible on coach issue roster</span>
+          `;
+        }
+
+        if (data.today_count !== undefined) {
+          document.getElementById('todayRegisteredCount').textContent = data.today_count;
+        }
+        if (data.inventory_count !== undefined) {
+          document.getElementById('totalInventoryCount').textContent = data.inventory_count;
+        }
+
+        // Add newly generated items to table
+        const tbody = document.getElementById('recentScansTableBody');
+        if (tbody) {
+          data.items.forEach(item => {
+            const newRow = document.createElement('tr');
+            newRow.className = 'border-bottom bg-success bg-opacity-10';
+            newRow.innerHTML = `
+              <td class="font-mono fw-bold text-dark">${item.linen_code}</td>
+              <td>${item.linen_type}</td>
+              <td><span class="badge bg-success text-white" style="font-size: 0.68rem;">Ready for Attendant</span></td>
+            `;
+            tbody.insertBefore(newRow, tbody.firstChild);
+            setTimeout(() => { newRow.classList.remove('bg-success', 'bg-opacity-10'); }, 2000);
+          });
+        }
+      } else {
+        alert(data.message || 'Error generating linen IDs.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      if (targetBtn) {
+        targetBtn.disabled = false;
+        targetBtn.innerHTML = originalText;
+      }
+      alert('Network error while generating linen IDs.');
+    });
+  }
+
+  function setAndRegister(code, type) {
+    selectType(type);
+    document.getElementById('mfgQrInput').value = code;
+    registerScannedManufacturerItem();
+  }
+
+  function generateFreshMfgTag() {
+    const prefixMap = { 'Bedsheet': 'BS', 'Blanket': 'BL', 'Towel': 'TW', 'Pillow Cover': 'PC' };
+    const pfx = prefixMap[currentType] || 'BS';
+    const randNum = Math.floor(10000 + Math.random() * 90000);
+    const newCode = `MFG-${pfx}-${randNum}`;
+    document.getElementById('mfgQrInput').value = newCode;
+    registerScannedManufacturerItem();
+  }
+
+  function toggleCameraScanner() {
+    const box = document.getElementById('laundryScannerBox');
+    const isHidden = box.style.display === 'none' || !box.style.display;
+    box.style.display = isHidden ? 'flex' : 'none';
+
+    if (isHidden && window.Html5Qrcode) {
+      const scanner = new Html5Qrcode("laundryCameraFeed");
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 220, height: 160 } },
+            (decodedText) => {
+              document.getElementById('mfgQrInput').value = decodedText;
+              scanner.stop().catch(() => {});
+              box.style.display = 'none';
+              registerScannedManufacturerItem();
+            },
+            () => {}
+          ).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }
+
+  function registerScannedManufacturerItem() {
+    const input = document.getElementById('mfgQrInput');
+    let code = input ? input.value.trim().toUpperCase() : '';
+
+    if (!code) {
+      alert('Please scan or enter a manufacturer QR code.');
+      return;
+    }
+
+    const selectedPrefix = manufacturerPrefixMap[currentType] || manufacturerPrefixMap['Bedsheet'];
+    if (code === selectedPrefix) {
+      generateFreshMfgTag();
+      return;
+    }
+
+    if (!code.startsWith(selectedPrefix) && code.startsWith('MFG-')) {
+      alert(`Use a ${selectedPrefix} code for ${currentType}.`);
+      return;
+    }
+
+    const btn = document.getElementById('registerPrintBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Adding to inventory...';
+
+    fetch('/api/laundry/register/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        manufacturer_qr: code,
+        linen_type: currentType
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-box-seam me-2"></i> Scan & Add to Inventory';
+
+      if (data.success) {
+        document.getElementById('qrResultCard').style.display = 'block';
+        document.getElementById('qrResultMsg').innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> ' + data.message;
+        document.getElementById('qrResultCode').textContent = data.linen_code + ' (' + data.linen_type + ')';
+        document.getElementById('todayRegisteredCount').textContent = data.today_count;
+        document.getElementById('totalInventoryCount').textContent = data.inventory_count;
+
+        // Prepend to recent scans table
+        const tbody = document.getElementById('recentScansTableBody');
+        if (tbody) {
+          const newRow = document.createElement('tr');
+          newRow.className = 'border-bottom bg-warning-subtle';
+          newRow.innerHTML = `
+            <td class="font-mono fw-bold text-dark">${data.linen_code}</td>
+            <td>${data.linen_type}</td>
+            <td><span class="badge bg-success text-white" style="font-size: 0.68rem;">Ready</span></td>
+          `;
+          tbody.insertBefore(newRow, tbody.firstChild);
+          setTimeout(() => { newRow.classList.remove('bg-warning-subtle'); }, 1500);
+        }
+      } else {
+        alert(data.message || 'Error registering item.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-box-seam me-2"></i> Scan & Add to Inventory';
+      alert('Network error while registering manufacturer item.');
+    });
+  }
+</script>
+{% endblock %}
+

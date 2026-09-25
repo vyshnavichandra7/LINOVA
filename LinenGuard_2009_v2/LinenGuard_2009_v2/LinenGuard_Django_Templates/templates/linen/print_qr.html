@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Print QR Label - {{ linen.linen_code }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8fafc;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .label-wrapper {
+      max-width: 400px;
+      margin: 40px auto;
+      background: #ffffff;
+      border: 2px dashed #0b1f3a;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .qr-img {
+      width: 200px;
+      height: 200px;
+    }
+    @media print {
+      body { background: #fff; margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .label-wrapper {
+        border: 2px solid #000;
+        box-shadow: none;
+        margin: 0;
+        width: 3.5in;
+        height: 2.2in;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container text-center no-print mt-4">
+    <button onclick="window.print()" class="btn btn-primary btn-lg fw-bold me-2">
+      🖨️ Print Label
+    </button>
+    <button onclick="window.close()" class="btn btn-outline-secondary btn-lg">
+      Close
+    </button>
+  </div>
+
+  <div class="label-wrapper">
+    <div class="fw-bold text-uppercase text-navy small mb-1">INDIAN RAILWAYS &bull; LINENGUARD</div>
+    <div class="fw-bold fs-4 font-monospace text-primary mb-2">{{ linen.linen_code }}</div>
+    <img src="{{ qr_data_url }}" alt="{{ linen.linen_code }}" class="qr-img img-fluid mb-2">
+    <div class="fw-semibold text-dark">{{ linen.linen_type }}</div>
+    <div class="text-muted extra-small font-monospace">SCAN TO RECORD CHECKPOINT</div>
+  </div>
+
+</body>
+</html>

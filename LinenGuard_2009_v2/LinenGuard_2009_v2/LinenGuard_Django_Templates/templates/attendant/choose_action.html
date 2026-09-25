@@ -1,0 +1,643 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Attendant Profile & Operations - LINOVA{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- ATTENDANT PROFILE & ASSIGNED DUTY CARD -->
+  <div class="app-card shadow-sm border p-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom pb-3 mb-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 54px; height: 54px; background: linear-gradient(135deg, #0d3b66, #1e7a46); color: #fff; font-size: 1.5rem; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+          <i class="bi bi-person-badge-fill text-warning"></i>
+        </div>
+        <div>
+          <div class="d-flex align-items-center gap-2">
+            <h1 class="h4 fw-bold mb-0 text-dark">{{ user.get_full_name|default:user.username|title }}</h1>
+            <span class="badge bg-primary text-white font-mono px-2 py-1" style="font-size: 0.78rem;">
+              {{ user.profile.badge_number|default:"ATT-B2-8821" }}
+            </span>
+          </div>
+          <div class="small text-secondary mt-1">
+            {{ user.profile.zone|default:"South Central Railway (SCR)" }} · Indian Railways Train Operations
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success text-white px-3 py-2 font-mono d-flex align-items-center gap-1 shadow-sm" style="font-size: 0.85rem;">
+          <i class="bi bi-check-circle-fill"></i> Duty Confirmed by Supervisor
+        </span>
+      </div>
+    </div>
+
+    <!-- Duty & Coach Details Highlight Grid -->
+    <div class="row g-3">
+      <!-- Assigned Coach -->
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3 rounded-3 border" style="background: rgba(13, 59, 102, 0.04);">
+          <div class="text-secondary small fw-semibold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+            <i class="bi bi-train-front text-primary me-1"></i> Allocated Coach
+          </div>
+          <div class="h3 fw-bold text-primary mb-0 mt-1 font-mono">
+            Coach {{ handoff.coach.coach_number }}
+          </div>
+          <div class="small text-muted font-mono" style="font-size: 0.76rem;">{{ handoff.coach.coach_type }} · {{ handoff.train.train_number }}</div>
+        </div>
+      </div>
+
+      <!-- Assigned Duty & Shift -->
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3 rounded-3 border" style="background: rgba(30, 122, 70, 0.04);">
+          <div class="text-secondary small fw-semibold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+            <i class="bi bi-clock-history text-success me-1"></i> Assigned Shift / Duty
+          </div>
+          <div class="h4 fw-bold text-success mb-0 mt-1">
+            {{ handoff.shift }} Shift
+          </div>
+          <div class="small text-muted" style="font-size: 0.76rem;">Passenger Linen Issuance & Custody</div>
+        </div>
+      </div>
+
+      <!-- Linen Inventory Quota -->
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3 rounded-3 border" style="background: rgba(180, 114, 10, 0.04);">
+          <div class="text-secondary small fw-semibold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+            <i class="bi bi-layers text-warning me-1"></i> Linen Handed Over
+          </div>
+          <div class="h3 fw-bold text-dark mb-0 mt-1 font-mono">
+            {{ handoff.bedsheets_handed_over }} <span class="fs-6 text-muted fw-normal">sheets</span>
+          </div>
+          <div class="small text-muted" style="font-size: 0.76rem;">Depot Stock Allocated</div>
+        </div>
+      </div>
+
+      <!-- Today's Operational Status -->
+      <div class="col-sm-6 col-lg-3">
+        <div class="p-3 rounded-3 border" style="background: rgba(99, 102, 241, 0.04);">
+          <div class="text-secondary small fw-semibold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+            <i class="bi bi-clipboard2-check text-indigo me-1"></i> Issued / Collected
+          </div>
+          <div class="h4 fw-bold text-dark mb-0 mt-1 font-mono">
+            <span class="text-primary">{{ issued_today }}</span> <span class="text-muted fs-6">/</span> <span class="text-success">{{ collected_today }}</span>
+          </div>
+          <div class="small text-muted" style="font-size: 0.76rem;">Route: {{ handoff.train.source }} ➔ {{ handoff.train.destination }}</div>
+        </div>
+      </div>
+    </div>
+  <!-- ============================================================
+       DEBOARDING NOTIFICATION BANNER (NEXT 20 MINUTES)
+       ============================================================ -->
+  {% if deboarding_passengers %}
+  <div class="deboarding-notification-banner p-3 p-md-4 rounded-3 shadow-sm" id="deboardingNotificationBanner">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="deboard-pulse-circle">
+          <i class="bi bi-bell-fill"></i>
+        </div>
+        <div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark font-mono fw-bold px-2 py-1 text-uppercase" style="font-size: 0.75rem;">
+              <i class="bi bi-clock-history me-1"></i>Deboarding in {{ upcoming_eta_minutes|default:18 }} Mins
+            </span>
+            <span class="text-white small opacity-90">
+              Stop: <strong class="text-white">{{ upcoming_station|default:"Secunderabad (SC)" }}</strong>
+            </span>
+          </div>
+          <h2 class="h5 fw-bold text-white mb-1 mt-1">
+            {{ deboarding_count }} Passengers Getting Off Soon — Immediate Linen Sweep Required
+          </h2>
+          <div class="text-white-50 small">
+            Coach {{ handoff.coach.coach_number }}: Collect linen and scan QR tags from 
+            {% for dp in deboarding_passengers %}
+              <strong class="text-warning font-mono">Berth {{ dp.berth }} ({{ dp.passenger_name }})</strong>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+            before train arrives at {{ deboarding_passengers.0.expected_arrival_time|default:"06:20" }} AM.
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" onclick="playRailwayChime()" title="Play station notification chime">
+          <i class="bi bi-volume-up-fill text-warning"></i> Chime
+        </button>
+        <a href="#deboardingSection" class="btn btn-sm btn-light fw-bold text-dark px-3 py-2">
+          <i class="bi bi-list-check me-1"></i>View Deboarding List
+        </a>
+        <a href="{% url 'attendant_collect' %}" class="btn btn-sm btn-warning text-dark fw-bold px-3 py-2">
+          <i class="bi bi-qr-code-scan me-1"></i>Scan & Collect Now
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEBOARDING PASSENGERS LIST SECTION (ORDERED BY BERTH / NEXT 20 MINS) -->
+  <div class="app-card shadow-sm border p-4" id="deboardingSection" style="border-left: 5px solid var(--amber) !important;">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="deboard-pulse-dot"></span>
+          <h2 class="h5 fw-bold mb-0 text-dark">
+            Passengers Deboarding in Next 20 Minutes (Linen Collection Priority)
+          </h2>
+        </div>
+        <div class="text-secondary small mt-1">
+          Ordered by berth for optimal coach sweep. Sweep these berths first to retrieve bedsheets and blankets before passengers alight.
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-warning text-dark font-mono px-3 py-2 fw-semibold">
+          <i class="bi bi-geo-alt-fill me-1"></i>ETA {{ upcoming_eta_minutes|default:18 }} mins · {{ upcoming_station|default:"Secunderabad (SC)" }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Deboarding Passenger Cards Grid -->
+    <div class="row g-3">
+      {% for dp in deboarding_passengers %}
+      <div class="col-md-6">
+        <div class="deboarding-card p-3 h-100 shadow-sm border">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-danger text-white font-mono fs-6 px-3 py-1">
+                Berth {{ dp.berth }}
+              </span>
+              <div>
+                <div class="fw-bold text-dark">{{ dp.passenger_name }}</div>
+                <div class="small text-muted font-mono" style="font-size: 0.76rem;">{{ dp.berth_type }} · {{ dp.masked_pnr }}</div>
+              </div>
+            </div>
+            <span class="badge bg-warning text-dark font-mono" style="font-size: 0.72rem;">
+              <i class="bi bi-clock me-1"></i>Deboarding in ~{{ dp.minutes_remaining }}m
+            </span>
+          </div>
+
+          <div class="p-2 rounded-2 bg-light border small my-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-secondary fw-semibold">Destination:</span>
+              <span class="text-dark fw-bold">{{ dp.destination_station }} ({{ dp.expected_arrival_time }})</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="text-secondary fw-semibold">Issued Linen:</span>
+              <div class="d-flex gap-1 flex-wrap">
+                {% for itm in dp.assigned_linen %}
+                  <span class="badge {% if itm.is_returned %}bg-success{% else %}bg-primary{% endif %} font-mono" style="font-size: 0.7rem;">
+                    {{ itm.type }}: {{ itm.code }} {% if itm.is_returned %}✓{% endif %}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between gap-2 mt-3 pt-2 border-top">
+            <span class="small font-mono {% if dp.is_collected %}text-success fw-bold{% else %}text-danger fw-semibold{% endif %}">
+              {% if dp.is_collected %}
+                <i class="bi bi-check-circle-fill"></i> Linen Collected & Scanned
+              {% else %}
+                <i class="bi bi-exclamation-circle-fill"></i> Sweep & Scan Pending
+              {% endif %}
+            </span>
+
+            <a href="{% url 'attendant_collect' %}?berth={{ dp.berth }}&code={{ dp.primary_code }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 px-3">
+              <i class="bi bi-qr-code-scan"></i> Collect & Scan QR
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if deboarding_passengers %}
+  <div class="app-card shadow-sm border p-4" style="border-left: 5px solid var(--danger) !important;">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-person-dash-fill text-danger fs-5"></i>
+          <h2 class="h5 fw-bold mb-0 text-dark">Ready to deboard — collect linen</h2>
+        </div>
+        <div class="text-secondary small mt-1">These passengers are next in the collection sweep and must be checked before the train reaches {{ upcoming_station|default:"Secunderabad (SC)" }}.</div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      {% for dp in deboarding_passengers %}
+      <span class="badge bg-danger text-white px-3 py-2 fw-semibold font-mono">
+        Berth {{ dp.berth }} — {{ dp.passenger_name }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Primary Operations CTA Banners -->
+  <div class="row g-3">
+    <!-- 1. Issue Linen CTA -->
+    <div class="col-md-6">
+      <a href="{% url 'attendant_issue' %}" class="hub-btn-card hub-btn-primary h-100 p-4 shadow-sm text-decoration-none" id="issueLinenHubBtn">
+        <div class="d-flex align-items-center gap-3">
+          <div class="hub-card-icon fs-1" style="color: #F5C24C;">
+            <i class="bi bi-qr-code-scan"></i>
+          </div>
+          <div>
+            <div class="hub-card-title h4 mb-1">Issue Linen (Camera Scanner)</div>
+            <div class="hub-card-sub small opacity-85">Scan QR code & issue fresh linen kit to boarding passenger</div>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <!-- 2. Collect Item CTA -->
+    <div class="col-md-6">
+      <a href="{% url 'attendant_collect' %}" class="hub-btn-card hub-btn-secondary h-100 p-4 shadow-sm text-decoration-none" id="collectItemHubBtn">
+        <div class="d-flex align-items-center gap-3">
+          <div class="hub-card-icon fs-1" style="color: #b36b32;">
+            <i class="bi bi-box-seam-fill"></i>
+          </div>
+          <div>
+            <div class="hub-card-title h4 mb-1">Collect Linen</div>
+            <div class="hub-card-sub small text-muted">Take linen back from a deboarding passenger at destination</div>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  </div>
+
+  {% comment %}
+  <!-- PASSENGER LIST FOR THIS PARTICULAR COACH (ISSUING LINEN OPERATIONS) -->
+  <!-- PASSENGER LIST FOR THIS PARTICULAR COACH (ISSUING LINEN OPERATIONS & ROSTER) -->
+  <div class="app-card shadow-sm border p-4" id="coachRosterSection">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-people-fill text-primary fs-5"></i>
+          <h2 class="h5 fw-bold mb-0 text-dark">
+            Coach {{ handoff.coach.coach_number }} Passenger Reservation Roster
+          </h2>
+        </div>
+        <div class="text-secondary small mt-1">
+          Official manifest for Train {{ handoff.train.train_number }} · Coach {{ handoff.coach.coach_number }}. Issue linen directly or monitor passenger journey status.
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border font-mono px-3 py-2">
+          {{ passengers|length }} Passengers in Coach {{ handoff.coach.coach_number }}
+        </span>
+        <a href="{% url 'attendant_roster' %}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1">
+          <i class="bi bi-file-earmark-text"></i> Full Roster Chart
+        </a>
+        <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+          <i class="bi bi-camera-fill"></i> Camera Scan Mode
+        </a>
+      </div>
+    </div>
+
+    <!-- Quick Search Filter Box -->
+    <div class="mb-3">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="bi bi-search"></i>
+        </span>
+        <input 
+          type="text" 
+          id="hubRosterSearchInput" 
+          class="form-control border-start-0 ps-0" 
+          placeholder="Filter passengers by berth, name, or PNR in Coach {{ handoff.coach.coach_number }}..."
+          onkeyup="filterHubRoster()"
+        >
+      </div>
+    </div>
+
+    <!-- Notification Alert Box for Quick Issuance -->
+    <div id="quickIssueAlert" class="alert alert-success d-flex align-items-center gap-2 py-2 px-3 mb-3 rounded-3" style="display: none !important;">
+      <i class="bi bi-check-circle-fill text-success fs-5"></i>
+      <span id="quickIssueAlertMsg" class="fw-semibold">Linen successfully issued to passenger.</span>
+    </div>
+
+    <!-- Passengers Table for Issuing Linen & Manifest -->
+    <div class="table-responsive">
+      <table class="table align-middle table-hover mb-0" id="hubPassengerTable">
+        <thead>
+          <tr class="text-secondary small text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+            <th>Berth</th>
+            <th>Passenger Details</th>
+            <th>PNR (Masked)</th>
+            <th>Destination</th>
+            <th>Linen & Status</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in passengers %}
+          <tr class="hub-passenger-row" id="passenger-row-{{ p.id }}" data-search="{{ p.berth }} {{ p.passenger_name|lower }} {{ p.pnr_number|lower }} {{ p.destination_station|lower }}">
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary text-white font-mono px-2 py-1 fs-6">
+                  {{ p.berth }}
+                </span>
+                <span class="small text-muted font-mono" style="font-size: 0.72rem;">{{ p.berth_type }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="fw-bold text-dark">{{ p.passenger_name }}</div>
+              <div class="text-muted small font-mono" style="font-size: 0.74rem;">
+                {% if p.passenger_age or p.passenger_gender %}
+                  {{ p.passenger_gender|default:"-" }} / {{ p.passenger_age|default:"-" }} yrs · 
+                {% endif %}
+                Coach {{ handoff.coach.coach_number }}
+              </div>
+            </td>
+            <td>
+              <span class="font-mono fw-semibold text-dark">{{ p.masked_pnr }}</span>
+              <div class="text-muted font-mono" style="font-size: 0.7rem;">{{ p.ticket_status|default:"CNF" }}</div>
+            </td>
+            <td>
+              <div class="small text-dark"><i class="bi bi-geo-alt text-danger me-1"></i><strong>{{ p.destination_station }}</strong></div>
+              <div class="small text-muted font-mono" style="font-size: 0.7rem;">Arr: {{ p.expected_arrival_time|default:"06:20" }}</div>
+            </td>
+            <td>
+              <div>
+                {% if p.status == 'Issued' or p.has_issued_linen %}
+                  <span class="badge bg-success text-white font-mono px-2 py-1" id="badge-status-{{ p.id }}" style="font-size: 0.72rem;">
+                    <i class="bi bi-check2 me-1"></i> Issued
+                  </span>
+                {% elif p.status == 'Boarding now' %}
+                  <span class="badge bg-warning text-dark font-mono px-2 py-1" id="badge-status-{{ p.id }}" style="font-size: 0.72rem;">
+                    <i class="bi bi-clock me-1"></i> Boarding now
+                  </span>
+                {% else %}
+                  <span class="badge bg-secondary text-white font-mono px-2 py-1" id="badge-status-{{ p.id }}" style="font-size: 0.72rem;">
+                    {{ p.status }}
+                  </span>
+                {% endif %}
+
+                {% if p.is_deboarding_soon %}
+                  <span class="badge bg-danger text-white font-mono ms-1" style="font-size: 0.7rem;">
+                    <i class="bi bi-alarm me-1"></i>Deboarding ~18m
+                  </span>
+                {% endif %}
+              </div>
+              {% if p.assigned_linen %}
+                <div class="mt-1">
+                  {% for itm in p.assigned_linen %}
+                    <span class="badge bg-light text-dark border font-mono" style="font-size: 0.68rem;">
+                      {{ itm.type }}: {{ itm.code }} {% if itm.is_returned %}✓{% endif %}
+                    </span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if p.is_deboarding_soon %}
+                <a href="{% url 'attendant_collect' %}?berth={{ p.berth }}&code={{ p.primary_linen_code|default:'BL-20561' }}" class="btn btn-sm btn-warning text-dark fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+                  <i class="bi bi-qr-code-scan"></i> Collect
+                </a>
+              {% else %}
+                <button 
+                  type="button" 
+                  class="btn btn-sm {% if p.status == 'Issued' or p.has_issued_linen %}btn-outline-success{% else %}btn-warning fw-semibold{% endif %} d-inline-flex align-items-center gap-1 shadow-sm"
+                  onclick="openQuickIssueModal('{{ p.id }}', '{{ p.pnr_number }}', '{{ p.masked_pnr }}', '{{ p.berth }}', '{{ p.passenger_name }}', '{{ p.destination_station }}')"
+                  id="btn-issue-{{ p.id }}"
+                >
+                  {% if p.status == 'Issued' or p.has_issued_linen %}
+                  <i class="bi bi-check2-circle"></i> Issued
+                  {% else %}
+                  <i class="bi bi-handbag-fill"></i> Issue Linen
+                  {% endif %}
+                </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">
+              No passengers registered for Coach {{ handoff.coach.coach_number }}.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+  {% endcomment %}
+
+</div>
+
+<script>
+  function filterHubRoster() {
+    const q = (document.getElementById('hubRosterSearchInput').value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.hub-passenger-row');
+    rows.forEach(r => {
+      const text = (r.getAttribute('data-search') || '').toLowerCase();
+      r.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+  }
+</script>
+
+<!-- QUICK ISSUE LINEN MODAL -->
+<div class="modal fade" id="quickIssueModal" tabindex="-1" aria-labelledby="quickIssueModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border shadow">
+      <div class="modal-header border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <div class="p-2 rounded-circle bg-warning bg-opacity-25 text-warning">
+            <i class="bi bi-ticket-perforated-fill fs-5"></i>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold text-dark mb-0" id="quickIssueModalLabel">Issue Linen Kit to Passenger</h5>
+            <div class="small text-muted">Indian Railways Linen Issuance System</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <!-- Passenger info recap -->
+        <div class="p-3 rounded-3 mb-3 border" style="background: rgba(13, 59, 102, 0.05);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold text-dark fs-5" id="modalBerth">Berth --</span>
+            <span class="badge bg-primary font-mono" id="modalCoach">Coach {{ handoff.coach.coach_number }}</span>
+          </div>
+          <div class="small text-muted">Passenger: <strong class="text-dark" id="modalPassenger">--</strong></div>
+          <div class="small text-muted">PNR: <strong class="text-dark font-mono" id="modalPnr">••••----</strong> · Dest: <span id="modalDest">--</span></div>
+        </div>
+
+        <!-- Linen Code / QR input -->
+        <form id="quickIssueForm" onsubmit="event.preventDefault(); submitQuickIssue();">
+          <input type="hidden" id="modalPnrRaw">
+          <input type="hidden" id="modalPassengerId">
+
+          <label class="form-label text-dark small fw-bold mb-1" for="modalLinenCode">
+            Linen Item QR Code / Linen ID <span class="text-danger">*</span>
+          </label>
+          <div class="input-group mb-2">
+            <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+            <input 
+              type="text" 
+              class="form-control font-mono fw-bold" 
+              id="modalLinenCode" 
+              placeholder="e.g. BS-2026-04825" 
+              value="BS-2026-04825" 
+              required
+            >
+          </div>
+
+          <div class="small text-muted mb-3 d-flex align-items-center justify-content-between">
+            <span>Verified in Depot Stock</span>
+            <span class="badge bg-light text-secondary border font-mono">Bedsheet (BS)</span>
+          </div>
+
+          <button type="submit" class="btn-tactile py-2" id="modalSubmitBtn">
+            <i class="bi bi-check-circle-fill me-1"></i> Confirm & Issue Linen
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let currentModal = null;
+
+  function openQuickIssueModal(passengerId, pnrRaw, maskedPnr, berth, name, dest) {
+    document.getElementById('modalPassengerId').value = passengerId;
+    document.getElementById('modalPnrRaw').value = pnrRaw;
+    document.getElementById('modalBerth').textContent = 'Berth ' + berth;
+    document.getElementById('modalPassenger').textContent = name;
+    document.getElementById('modalPnr').textContent = maskedPnr;
+    document.getElementById('modalDest').textContent = dest;
+
+    // Generate random realistic linen code or keep sample
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('modalLinenCode').value = 'BS-2026-0' + randNum;
+
+    const modalEl = document.getElementById('quickIssueModal');
+    currentModal = new bootstrap.Modal(modalEl);
+    currentModal.show();
+  }
+
+  function submitQuickIssue() {
+    const pId = document.getElementById('modalPassengerId').value;
+    const pnr = document.getElementById('modalPnrRaw').value;
+    const linenCode = document.getElementById('modalLinenCode').value.trim().toUpperCase();
+    const btn = document.getElementById('modalSubmitBtn');
+
+    if (!linenCode) {
+      alert('Please enter or scan a linen code.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Issuing...';
+
+    fetch('/api/attendant/issue/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        pnr_number: pnr,
+        linen_code: linenCode
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Confirm & Issue Linen';
+
+      if (data.success) {
+        if (currentModal) currentModal.hide();
+
+        // Update row status tag
+        const badge = document.getElementById('badge-status-' + pId);
+        if (badge) {
+          badge.className = 'badge bg-success text-white font-mono px-2 py-1';
+          badge.innerHTML = '<i class="bi bi-check2 me-1"></i> Issued';
+        }
+
+        // Update button
+        const issueBtn = document.getElementById('btn-issue-' + pId);
+        if (issueBtn) {
+          issueBtn.className = 'btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 shadow-sm';
+          issueBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Issued';
+        }
+
+        // Show toast
+        const alertBox = document.getElementById('quickIssueAlert');
+        const alertMsg = document.getElementById('quickIssueAlertMsg');
+        if (alertBox && alertMsg) {
+          alertMsg.textContent = `✓ Linen ${linenCode} successfully issued to ${data.passenger_name || 'passenger'} (Berth ${data.berth || ''})!`;
+          alertBox.style.setProperty('display', 'flex', 'important');
+          setTimeout(() => {
+            alertBox.style.setProperty('display', 'none', 'important');
+          }, 4000);
+        }
+      } else {
+        alert(data.message || 'Error issuing linen.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Confirm & Issue Linen';
+      alert('Network error while issuing linen.');
+    });
+  }
+
+  // Web Audio Synthesizer: Authentic 2-Tone Railway Deboarding Chime (587Hz -> 880Hz)
+  function playRailwayChime() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+
+      // Tone 1: 587.33 Hz (D5)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now);
+      gain1.gain.setValueAtTime(0.2, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.35);
+
+      // Tone 2: 880.00 Hz (A5)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880.00, now + 0.22);
+      gain2.gain.setValueAtTime(0.25, now + 0.22);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.22);
+      osc2.stop(now + 0.7);
+    } catch (e) {
+      console.log('Audio chime error:', e);
+    }
+  }
+
+  // Auto chime on page load if user gesture allows
+  document.addEventListener('DOMContentLoaded', () => {
+    // Only attempt chime if deboarding passengers exist
+    const hasDeboarding = document.getElementById('deboardingNotificationBanner');
+    if (hasDeboarding) {
+      setTimeout(() => {
+        playRailwayChime();
+      }, 500);
+    }
+  });
+</script>
+{% endblock %}

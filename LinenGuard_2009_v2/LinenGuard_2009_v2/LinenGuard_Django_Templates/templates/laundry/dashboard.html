@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Laundry Processing Dashboard - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-water text-info me-2"></i>LAUNDRY OPERATIONS DASHBOARD</h3>
+    <p class="text-muted small mb-0">Depot intake, industrial thermal disinfection, and reissue management</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'linen_register' %}" class="btn btn-outline-primary btn-sm fw-bold">
+      <i class="bi bi-plus-square me-1"></i>Register Linen
+    </a>
+    <a href="{% url 'laundry_scanner' %}" class="btn btn-info text-dark btn-sm fw-bold">
+      <i class="bi bi-upc-scan me-1"></i>Intake Scanner
+    </a>
+    <a href="{% url 'laundry_washing' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-arrow-repeat me-1"></i>Washing Queue
+    </a>
+  </div>
+</div>
+
+<!-- Laundry Stat Cards (Section 31) -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card p-3 border-info">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-bold">RETURNED IN TRANSIT</span>
+        <div class="stat-icon bg-subtle-blue"><i class="bi bi-truck"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-dark">{{ returned_in_transit }}</h3>
+      <span class="text-muted extra-small">Collected by attender</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card p-3 border-primary">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-bold">RECEIVED AT DOCK</span>
+        <div class="stat-icon bg-subtle-purple"><i class="bi bi-building-down"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-primary">{{ received_count }}</h3>
+      <span class="text-muted extra-small">Scanned at laundry intake</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card p-3 border-warning">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-bold">IN WASHING CYCLE</span>
+        <div class="stat-icon bg-subtle-amber"><i class="bi bi-water"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-warning">{{ washing_count }}</h3>
+      <span class="text-muted extra-small">High temp disinfection</span>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card p-3 border-success">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-bold">READY FOR REISSUE</span>
+        <div class="stat-icon bg-subtle-green"><i class="bi bi-check-circle"></i></div>
+      </div>
+      <h3 class="fw-bold mb-0 text-success">{{ ready_count }}</h3>
+      <span class="text-muted extra-small">Packaged sanitized kits</span>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Scan Intake Action -->
+<div class="card shadow-sm border-0 mb-4 bg-light">
+  <div class="card-body p-4 text-center">
+    <h5 class="fw-bold text-navy mb-2">Incoming Linen Intake Scanner</h5>
+    <p class="text-muted small mx-auto mb-3" style="max-width: 500px;">
+      Scan QR codes on linen bags arriving from trains to verify terminal handover and intake into laundry processing.
+    </p>
+    <a href="{% url 'laundry_scanner' %}" class="btn btn-primary btn-lg fw-bold px-4">
+      <i class="bi bi-camera me-2"></i> OPEN INTAKE SCANNER
+    </a>
+  </div>
+</div>
+
+<!-- Active Laundry Inventory Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3 fw-bold">
+    <i class="bi bi-card-checklist text-primary me-2"></i>Active Depot Laundry Queue
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Linen Code</th>
+            <th>Type</th>
+            <th>Current Stage</th>
+            <th>Physical Location</th>
+            <th>Last Updated</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in recent_laundry_items %}
+          <tr>
+            <td class="font-monospace fw-bold text-primary">{{ item.linen_code }}</td>
+            <td><span class="badge bg-light text-dark border">{{ item.linen_type }}</span></td>
+            <td>
+              <span class="badge {% if item.status == 'READY_FOR_REISSUE' %}bg-success{% elif item.status == 'WASHING' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+                {{ item.get_status_display }}
+              </span>
+            </td>
+            <td class="small text-muted">{{ item.current_location }}</td>
+            <td class="small text-muted">{{ item.updated_at|date:"d M, H:i" }}</td>
+            <td>
+              <a href="{% url 'linen_lifecycle' item.linen_code %}" class="btn btn-sm btn-outline-primary py-0">
+                Trace
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">No linen currently undergoing laundry processing.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

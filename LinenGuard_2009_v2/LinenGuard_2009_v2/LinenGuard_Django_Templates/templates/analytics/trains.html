@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Train Analytics - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-bar-chart-steps text-primary me-2"></i>TRAIN-WISE LINEN ANALYTICS</h3>
+    <p class="text-muted small mb-0">Reconciliation performance, discrepancy ratios, and route risk classification</p>
+  </div>
+  <div class="badge bg-light text-dark border px-3 py-2">
+    Rule-Based Risk Classification
+  </div>
+</div>
+
+<!-- Risk Formula Explainer Card (Section 26) -->
+<div class="alert alert-info border-info shadow-sm mb-4">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-info-circle-fill fs-3 me-3 text-info"></i>
+    <div>
+      <h6 class="fw-bold mb-1">Operational Risk Classification Formula:</h6>
+      <p class="mb-0 small">
+        Risk metrics are calculated based on operational discrepancy rates:
+        <span class="badge bg-success ms-1">LOW RISK (0 - 1%)</span>
+        <span class="badge bg-warning text-dark ms-1">MEDIUM RISK (1 - 5%)</span>
+        <span class="badge bg-danger ms-1">HIGH RISK (> 5%)</span>.
+        This provides objective terminal accountability without speculative accusations.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Train Analytics Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Train Number</th>
+            <th>Train Name</th>
+            <th>Route (Source &rarr; Destination)</th>
+            <th class="text-center">Expected</th>
+            <th class="text-center">Returned</th>
+            <th class="text-center">Unaccounted</th>
+            <th class="text-center">Discrepancy %</th>
+            <th class="text-center">Operational Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in trains_data %}
+          <tr>
+            <td class="fw-bold fs-6 font-monospace">{{ t.train.train_number }}</td>
+            <td class="fw-semibold">{{ t.train.train_name }}</td>
+            <td class="small text-muted">{{ t.train.source }} &rarr; {{ t.train.destination }}</td>
+            <td class="text-center fw-bold">{{ t.expected }}</td>
+            <td class="text-center text-success fw-bold">{{ t.returned }}</td>
+            <td class="text-center text-danger fw-bold fs-6">{{ t.unaccounted }}</td>
+            <td class="text-center font-monospace">{{ t.loss_percentage }}%</td>
+            <td class="text-center">
+              <span class="badge bg-{{ t.risk_class }} px-3 py-1 fw-bold">
+                {{ t.risk }}
+              </span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-4 text-muted">No train journeys recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

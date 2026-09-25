@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Start Collection Session - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-play-circle text-success me-2"></i>START COLLECTION SESSION</h3>
+        <p class="text-muted small mb-0">Initialize attender coach sweep and load expected berth quantities</p>
+      </div>
+      <a href="{% url 'attender_dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">Select Train</label>
+            <select name="train" class="form-select form-select-lg" required>
+              {% for train in trains %}
+                <option value="{{ train.id }}" {% if train.train_number == '12760' %}selected{% endif %}>
+                  Train {{ train.train_number }} - {{ train.train_name }} ({{ train.source }} &rarr; {{ train.destination }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Select Coach</label>
+            <select name="coach" class="form-select form-select-lg" required>
+              {% for coach in coaches %}
+                <option value="{{ coach.id }}" {% if coach.coach_number == 'B2' %}selected{% endif %}>
+                  Coach {{ coach.coach_number }} ({{ coach.get_coach_type_display }}) &bull; Train {{ coach.train.train_number }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-bold">Expected Linen Quantity (Items Issued)</label>
+            <input type="number" name="expected_quantity" class="form-control form-control-lg" value="100" min="1" required>
+            <div class="form-text small">Default is 100 items per 3-Tier coach (or actual active berth assignments).</div>
+          </div>
+
+          <button type="submit" class="btn btn-success btn-lg w-100 shadow fw-bold py-3">
+            <i class="bi bi-broadcast me-2"></i> START COLLECTION SWEEP
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

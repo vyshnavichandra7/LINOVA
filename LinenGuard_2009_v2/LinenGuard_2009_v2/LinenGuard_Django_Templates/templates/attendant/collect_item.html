@@ -1,0 +1,286 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Collect Linen Item - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Breadcrumb Navigation -->
+  <div class="d-flex align-items-center justify-content-between mb-1">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'attendant_hub' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-arrow-left"></i> Action Hub
+      </a>
+      <h1 class="h4 fw-bold mb-0 text-dark">Collect Soiled Linen Item</h1>
+    </div>
+    <div class="text-secondary small font-mono">
+      Train {{ handoff.train.train_number }} · Coach {{ handoff.coach.coach_number }}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    
+    <!-- Left Column: Scanner Target & Confirmation -->
+    <div class="col-lg-7">
+      {% if deboarding_passengers %}
+      <!-- Deboarding Quick Sweep Notification & Priority Chips -->
+      <div class="p-3 mb-3 bg-warning-subtle border border-warning rounded-3 shadow-sm">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="deboard-pulse-dot" style="width: 9px; height: 9px; background-color: #b45309; border-radius: 50%; display: inline-block;"></span>
+            <strong class="text-dark small">Priority Deboarding Sweep (< 20 Mins)</strong>
+          </div>
+          <span class="badge bg-warning text-dark font-mono" style="font-size: 0.75rem;">
+            Secunderabad (SC) · ETA 18m
+          </span>
+        </div>
+        <div class="small text-secondary mb-2">
+          Passengers getting off train next. Click passenger tag to pre-fill & verify linen collection:
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          {% for dp in deboarding_passengers %}
+            <button type="button" class="btn btn-sm btn-white border d-flex align-items-center gap-2 bg-white shadow-xs py-1 px-2"
+                    onclick="simulateScan('{{ dp.primary_code }}', '{{ dp.berth }}', '{{ dp.passenger_name }}', '{{ dp.masked_pnr }}')">
+              <span class="badge bg-danger">B{{ dp.berth }}</span>
+              <span class="fw-semibold text-dark">{{ dp.passenger_name }}</span>
+              <span class="font-mono text-primary small">{{ dp.primary_code }}</span>
+              <i class="bi bi-qr-code text-warning"></i>
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="app-card">
+        
+        <!-- Full-width scan target with corner-bracket styling [  ] -->
+        <div class="scan-target-box" id="scanTargetBox" style="height: 280px;">
+          <div class="scan-corner tl"></div>
+          <div class="scan-corner tr"></div>
+          <div class="scan-corner bl"></div>
+          <div class="scan-corner br"></div>
+          <div class="scan-laser-line"></div>
+          
+          <div id="cameraPreview" style="width: 100%; height: 100%; object-fit: cover;"></div>
+          
+          <div class="position-absolute text-white-50 small d-flex flex-column align-items-center" id="scanPromptOverlay">
+            <i class="bi bi-qr-code fs-1 text-warning mb-2"></i>
+            <span class="fs-6 fw-semibold text-white">Point camera at Linen QR code</span>
+            <span class="text-white-50">Hold camera steady 6–10 inches from tag</span>
+          </div>
+        </div>
+
+        <!-- Manual Entry Option & Demo Scan -->
+        <div class="d-flex gap-2 my-3">
+          <button type="button" class="btn btn-outline-secondary flex-fill py-2 fw-semibold bg-white" onclick="toggleManualEntry()">
+            <i class="bi bi-keyboard me-1"></i> Enter linen ID manually
+          </button>
+          <button type="button" class="btn btn-outline-dark flex-fill py-2 fw-semibold bg-white" onclick="simulateScan('{{ demo_qr }}', '{{ target_berth|default:"24" }}', 'R. Sharma', '••••1001')">
+            <i class="bi bi-magic text-warning me-1"></i> Demo Scan: {{ demo_qr }}{% if target_berth %} (Berth {{ target_berth }}){% endif %}
+          </button>
+        </div>
+
+        <!-- Manual input toggle box -->
+        <div id="manualEntrySection" class="p-3 bg-light rounded-3 border mb-3" style="display: none;">
+          <label class="rail-input-label">Linen ID (e.g. BL-20561 or BS-10247)</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="manualLinenInput" class="rail-input font-mono" placeholder="BL-20561" value="{{ demo_qr }}">
+            <button type="button" class="btn btn-dark px-4 fw-bold" onclick="simulateScan(document.getElementById('manualLinenInput').value)">Verify</button>
+          </div>
+        </div>
+
+        <!-- Confirmation Card (Appears after scan: Item type, ID, Berth) -->
+        <div class="scanned-confirmation-card p-3 my-3" id="returnConfirmationCard" style="display: none;">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="scanned-card-eyebrow h6 mb-1" id="itemTypeLabel">
+                <i class="bi bi-check-circle-fill me-1"></i> Scanned — Blanket
+              </div>
+              <div class="scanned-card-code font-mono fs-5" id="itemCodeLabel">
+                {{ demo_qr }}
+              </div>
+              <div class="small text-success fw-semibold mt-1" id="itemBerthLabel">
+                Assigned to Coach {{ handoff.coach.coach_number }} / Berth {{ target_berth|default:"24" }}
+              </div>
+            </div>
+            <span class="badge bg-success py-2 px-3 fs-6">Verified</span>
+          </div>
+        </div>
+
+        <!-- One button, labeled exactly: "Confirm" (Deliberate separate tap) -->
+        <button 
+          type="button" 
+          class="btn-tactile py-3 mt-2" 
+          id="confirmReturnBtn" 
+          onclick="confirmReturn()"
+          disabled
+        >
+          Confirm
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Right Column: Two-Number Tally & Deboarding Sweep List -->
+    <div class="col-lg-5">
+      <div class="app-card h-100 d-flex flex-column justify-content-between">
+        
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-3">Coach Inventory Status</h2>
+          
+          <!-- Two-number tally below (Collected / Remaining) — plain numbers, NOT split-flap -->
+          <div class="row g-3 mb-4">
+            <div class="col-6">
+              <div class="tally-tile success p-4">
+                <div class="tally-tile-num font-mono display-4" id="tallyCollectedNum">{{ collected_count }}</div>
+                <div class="tally-tile-label fs-6 mt-1">Collected</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="tally-tile amber p-4">
+                <div class="tally-tile-num font-mono display-4" id="tallyRemainingNum">{{ remaining_count }}</div>
+                <div class="tally-tile-label fs-6 mt-1">Remaining</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deboarding Passenger Sweep List (Ordered by Berth) -->
+          {% if deboarding_passengers %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h3 class="h6 fw-bold text-dark mb-0">
+                <i class="bi bi-clock-history text-warning me-1"></i>Deboarding Next (20 Mins)
+              </h3>
+              <span class="badge bg-danger font-mono">{{ deboarding_passengers|length }} Pending</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+              {% for dp in deboarding_passengers %}
+              <div class="p-2 border rounded-2 bg-light d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge bg-danger font-mono" style="font-size: 0.72rem;">B{{ dp.berth }}</span>
+                    <strong class="text-dark small">{{ dp.passenger_name }}</strong>
+                  </div>
+                  <div class="text-muted font-mono" style="font-size: 0.72rem;">
+                    {{ dp.destination_station }} · Linen: {{ dp.primary_code }}
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 font-mono" style="font-size: 0.75rem;"
+                        onclick="simulateScan('{{ dp.primary_code }}', '{{ dp.berth }}', '{{ dp.passenger_name }}', '{{ dp.masked_pnr }}')">
+                  Scan QR
+                </button>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="p-3 bg-light rounded-3 border small text-secondary mb-3">
+            <i class="bi bi-info-circle me-1 text-primary"></i> <strong>Operational Notice:</strong> Each scanned return terminates that item's active custody journey and marks it ready for terminal laundry intake.
+          </div>
+        </div>
+
+        <div class="pt-3 border-top text-center">
+          <a href="{% url 'attendant_end_report' %}" class="btn btn-outline-primary w-100 py-2 fw-semibold">
+            <i class="bi bi-clipboard-check me-1"></i> View Coach Sweep Report
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let currentScannedCode = null;
+  let collectedCount = {{ collected_count }};
+  let remainingCount = {{ remaining_count }};
+
+  function toggleManualEntry() {
+    const sec = document.getElementById('manualEntrySection');
+    sec.style.display = (sec.style.display === 'none' || !sec.style.display) ? 'block' : 'none';
+  }
+
+  function simulateScan(code, berth, name, pnr) {
+    if (!code) code = '{{ demo_qr|default:"BL-20561" }}';
+    currentScannedCode = code;
+
+    const card = document.getElementById('returnConfirmationCard');
+    card.style.display = 'block';
+
+    document.getElementById('itemCodeLabel').textContent = code;
+    const isBedsheet = code.startsWith('BS');
+    const isTowel = code.startsWith('TW');
+    const typeStr = isBedsheet ? 'Bedsheet' : (isTowel ? 'Towel' : 'Blanket');
+    document.getElementById('itemTypeLabel').innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Scanned — ' + typeStr;
+
+    const b = berth || '{{ target_berth|default:"24" }}';
+    const n = name ? (' · ' + name) : '';
+    const p = pnr ? (' · PNR ' + pnr) : '';
+    document.getElementById('itemBerthLabel').textContent = 'Assigned to Coach {{ handoff.coach.coach_number }} / Berth ' + b + n + p;
+
+    const confirmBtn = document.getElementById('confirmReturnBtn');
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.style.background = '';
+    confirmBtn.disabled = false;
+    confirmBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function confirmReturn() {
+    if (!currentScannedCode) return;
+
+    const btn = document.getElementById('confirmReturnBtn');
+    btn.disabled = true;
+    btn.textContent = 'Recording return...';
+
+    fetch('/api/collection/return/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        session_id: '{{ session.id|default:"1" }}',
+        linen_code: currentScannedCode,
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        throw new Error(data.message || 'Unable to record the collection.');
+      }
+
+      btn.textContent = '✓ Returned Confirmed';
+      btn.style.background = 'var(--green)';
+
+      collectedCount += 1;
+      remainingCount = Math.max(0, remainingCount - 1);
+      document.getElementById('tallyCollectedNum').textContent = collectedCount;
+      document.getElementById('tallyRemainingNum').textContent = remainingCount;
+
+      setTimeout(() => {
+        window.location.href = '{% url "attendant_hub" %}';
+      }, 1400);
+    })
+    .catch(err => {
+      btn.textContent = err.message || 'Unable to record collection';
+      btn.style.background = 'var(--red)';
+      btn.disabled = false;
+    });
+  }
+
+  // If code was passed in URL query param, automatically trigger simulateScan on load
+  window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeParam = urlParams.get('code');
+    const berthParam = urlParams.get('berth');
+    if (codeParam) {
+      simulateScan(codeParam, berthParam);
+    }
+  });
+</script>
+{% endblock %}

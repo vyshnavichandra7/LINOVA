@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Loss Hotspots & Intelligence - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-fire text-danger me-2"></i>COACH DISCREPANCY HOTSPOTS</h3>
+    <p class="text-muted small mb-0">Pattern detection for coaches with high discrepancy frequency</p>
+  </div>
+  <div class="badge bg-danger text-white px-3 py-2">
+    High Discrepancy Tracking
+  </div>
+</div>
+
+<!-- Section 27 Callout -->
+<div class="alert alert-secondary border shadow-sm mb-4">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-shield-check fs-3 me-3 text-primary"></i>
+    <div>
+      <h6 class="fw-bold mb-1">Operational Terminology Standard:</h6>
+      <p class="mb-0 small text-muted">
+        Coaches with repeated unreturned items are tagged with <strong>"High discrepancy frequency"</strong>. This directs inspection resources to coach linen storage cabinets, transit handovers, and destination platforms without unwarranted accusations.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Coach Hotspots Table -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-3 fw-bold">
+        <i class="bi bi-grid-3x3 text-primary me-2"></i>Coach Ranking by Unaccounted Count
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-railway mb-0">
+            <thead>
+              <tr>
+                <th>Train</th>
+                <th>Coach</th>
+                <th>Type</th>
+                <th class="text-center">Expected</th>
+                <th class="text-center">Unaccounted</th>
+                <th class="text-center">Discrepancy Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ch in coach_hotspots %}
+              <tr class="{% if ch.is_hotspot %}table-danger{% endif %}">
+                <td class="fw-bold font-monospace">{{ ch.train.train_number }}</td>
+                <td><span class="badge bg-navy fs-6">Coach {{ ch.coach.coach_number }}</span></td>
+                <td><span class="badge bg-light text-dark border">{{ ch.coach.get_coach_type_display }}</span></td>
+                <td class="text-center">{{ ch.expected }}</td>
+                <td class="text-center fw-bold {% if ch.unaccounted > 0 %}text-danger fs-6{% else %}text-muted{% endif %}">
+                  {{ ch.unaccounted }}
+                </td>
+                <td class="text-center">
+                  {% if ch.is_hotspot %}
+                    <span class="badge bg-danger">High Discrepancy Frequency</span>
+                  {% elif ch.unaccounted > 0 %}
+                    <span class="badge bg-warning text-dark">Moderate Variance</span>
+                  {% else %}
+                    <span class="badge bg-success">Zero Discrepancy (100% Accounted)</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted">No coach discrepancies recorded.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI & RFID Architecture Roadmaps (Sections 46 & 47) -->
+  <div class="col-lg-5">
+    
+    <!-- AI Architecture Card (Section 46) -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-navy text-white py-3 fw-bold">
+        <i class="bi bi-cpu text-warning me-2"></i>Future AI Intelligence Architecture
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          LinenGuard currently employs transparent operational rule-based logic. The production architecture is structured for machine learning anomaly detection:
+        </p>
+
+        <div class="bg-light p-3 rounded-3 text-center font-monospace small border">
+          <div class="badge bg-primary mb-1">Historical Scan Data</div>
+          <div class="text-muted">&darr;</div>
+          <div class="badge bg-info text-dark mb-1">Anomaly Detection Engine</div>
+          <div class="text-muted">&darr;</div>
+          <div class="badge bg-warning text-dark mb-1">Route & Train Risk Prediction</div>
+          <div class="text-muted">&darr;</div>
+          <div class="badge bg-danger mb-0">Loss Hotspot Identification</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Future RFID Architecture Card (Section 47) -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-navy text-white py-3 fw-bold">
+        <i class="bi bi-broadcast text-cyan me-2"></i>Future RFID Hardware Integration
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">
+          LinenGuard's data schema is decoupled from the identification layer. QR scanning can be supplemented by UHF RFID gateways at coach vestibules:
+        </p>
+        <div class="row g-2 text-center small mt-2">
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light">
+              <strong class="text-primary d-block">Current (MVP):</strong>
+              <span class="badge bg-secondary my-1">QR Camera Scan</span>
+              <span class="text-muted extra-small d-block">1-by-1 attender sweep</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light">
+              <strong class="text-success d-block">Future (Phase 2):</strong>
+              <span class="badge bg-success my-1">UHF RFID Portal</span>
+              <span class="text-muted extra-small d-block">Bulk sweep & auto-tally</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

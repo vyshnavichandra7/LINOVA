@@ -1,0 +1,130 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Sign in - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-7 col-lg-5">
+    
+    <div class="app-card shadow-sm">
+      
+      <div class="text-center pb-3 mb-3 border-bottom">
+        <img src="/static/img/logo.jpeg" alt="LINOVA Logo" style="height: 68px; width: auto; object-fit: contain; border-radius: 12px; background: #ffffff; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" class="mb-2">
+        <h2 class="h4 fw-bold mb-1 text-dark">LINOVA Portal</h2>
+        <div class="small text-secondary">Indian Railways Traceability & Chain-of-Custody System</div>
+      </div>
+
+      <form method="POST" action="{% url 'login' %}" id="loginForm" class="d-flex flex-column">
+        {% csrf_token %}
+        <input type="hidden" name="role_choice" id="roleChoiceInput" value="{{ selected_role|default:'attendant' }}">
+
+        <!-- Role Selection Segmented Tiles -->
+        <label class="rail-input-label mb-2">Select Access Role</label>
+        <div class="role-tiles-grid mb-3" role="radiogroup" aria-label="Role selection">
+          <button 
+            type="button" 
+            class="role-tile-btn {% if selected_role == 'attendant' or not selected_role %}active{% endif %}" 
+            id="role-btn-attendant"
+            onclick="setRole('attendant', 'ATT-B2-8821', 'attender123')"
+          >
+            <i class="bi bi-person-badge d-block fs-5 mb-1"></i>
+            Attendant
+          </button>
+          
+          <button 
+            type="button" 
+            class="role-tile-btn {% if selected_role == 'laundry' %}active{% endif %}" 
+            id="role-btn-laundry"
+            onclick="setRole('laundry', 'LND-STN-401', 'laundry123')"
+          >
+            <i class="bi bi-water d-block fs-5 mb-1"></i>
+            Laundry
+          </button>
+          
+          <button 
+            type="button" 
+            class="role-tile-btn {% if selected_role == 'supervisor' or selected_role == 'admin' %}active{% endif %}" 
+            id="role-btn-supervisor"
+            onclick="setRole('supervisor', 'EMP-ADM-01', 'admin123')"
+          >
+            <i class="bi bi-shield-lock d-block fs-5 mb-1"></i>
+            Supervisor
+          </button>
+        </div>
+
+        <div class="rail-input-group">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="rail-input-label mb-0" for="employeeIdInput">Employee ID / Badge</label>
+            <span class="small text-muted" style="font-size: 0.75rem;">Login with any ID or username</span>
+          </div>
+          <input 
+            type="text" 
+            id="employeeIdInput" 
+            name="employee_id" 
+            class="rail-input" 
+            placeholder="e.g. ATT-B2-8821 or ATT-B1-4019"
+            value="ATT-B2-8821"
+            autocomplete="username"
+          >
+        </div>
+
+        <!-- Quick Attendant IDs for Testing Assignments -->
+        <div class="mb-3">
+          <div class="small text-muted mb-1" style="font-size: 0.75rem;">Select Attendant Badge:</div>
+          <div class="d-flex flex-wrap gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-mono" style="font-size: 0.75rem;" onclick="fillBadge('ATT-B2-8821', 'attender123')">ATT-B2-8821 (Rahul)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-mono" style="font-size: 0.75rem;" onclick="fillBadge('ATT-B1-4019', 'attender123')">ATT-B1-4019 (Suresh)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-mono" style="font-size: 0.75rem;" onclick="fillBadge('ATT-B3-6112', 'attender123')">ATT-B3-6112 (Vikas)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-mono" style="font-size: 0.75rem;" onclick="fillBadge('ATT-A1-2204', 'attender123')">ATT-A1-2204 (Deepak)</button>
+          </div>
+        </div>
+
+        <div class="rail-input-group mb-4">
+          <label class="rail-input-label" for="passwordInput">Password</label>
+          <input 
+            type="password" 
+            id="passwordInput" 
+            name="password" 
+            class="rail-input" 
+            placeholder="••••••••"
+            value="attender123"
+            autocomplete="current-password"
+          >
+        </div>
+
+        <!-- Primary Tactile Button: Sign in -->
+        <button type="submit" class="btn-tactile py-3" id="signInSubmitBtn">
+          Sign in
+        </button>
+
+        <div class="text-center mt-3 small text-muted">
+          Secured by IRCTC Railway Operations Architecture
+        </div>
+      </form>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function setRole(roleName, defaultEmpId, defaultPwd) {
+    document.getElementById('roleChoiceInput').value = roleName;
+
+    document.querySelectorAll('.role-tile-btn').forEach(btn => btn.classList.remove('active'));
+    const activeTile = document.getElementById('role-btn-' + roleName);
+    if (activeTile) activeTile.classList.add('active');
+
+    const empInput = document.getElementById('employeeIdInput');
+    const pwdInput = document.getElementById('passwordInput');
+    if (empInput) empInput.value = defaultEmpId;
+    if (pwdInput) pwdInput.value = defaultPwd;
+  }
+
+  function fillBadge(badgeNumber, pwd) {
+    setRole('attendant', badgeNumber, pwd);
+  }
+</script>
+{% endblock %}

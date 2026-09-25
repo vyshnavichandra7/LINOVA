@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Assignments - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-list-check text-primary me-2"></i>Linen Journey Assignments</h3>
+    <p class="text-muted small mb-0">Active journey deployments and passenger berth issuance records</p>
+  </div>
+  <a href="{% url 'assign_linen' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>New Assignment</a>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white py-3 fw-bold">
+    <i class="bi bi-train-front text-primary me-2"></i>Active In-Transit Assignments ({{ active_assignments.count }})
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Linen Code</th>
+            <th>Type</th>
+            <th>Train</th>
+            <th>Coach / Berth</th>
+            <th>Route (Journey)</th>
+            <th>Passenger PNR</th>
+            <th>Expected Collection</th>
+            <th>Status</th>
+            <th>Trace</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asn in active_assignments %}
+          <tr>
+            <td>
+              <a href="{% url 'linen_detail' asn.linen.linen_code %}" class="fw-bold font-monospace text-primary text-decoration-none">
+                {{ asn.linen.linen_code }}
+              </a>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ asn.linen.linen_type }}</span></td>
+            <td class="fw-bold">{{ asn.train.train_number }}</td>
+            <td>
+              <span class="badge bg-primary">Coach {{ asn.coach.coach_number }}</span>
+              <strong class="ms-1">Berth {{ asn.berth }}</strong>
+            </td>
+            <td class="small text-muted fw-semibold">
+              <i class="bi bi-geo-alt text-danger me-1"></i>{{ asn.source_station }} ➔ {{ asn.destination_station }}
+            </td>
+            <td><span class="badge bg-light text-dark border font-monospace">{{ asn.passenger_reference }}</span></td>
+            <td class="small text-muted">{{ asn.expected_collection_time|date:"H:i" }}</td>
+            <td><span class="badge bg-primary">{{ asn.assignment_status }}</span></td>
+            <td>
+              <a href="{% url 'linen_lifecycle' asn.linen.linen_code %}" class="btn btn-sm btn-outline-primary py-0 px-2">
+                Timeline
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center py-4 text-muted">No active assignments in progress.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

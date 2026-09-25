@@ -1,0 +1,334 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Coach {{ handoff.coach.coach_number }} Passenger Roster - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Top Breadcrumb & Action Bar -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'attendant_hub' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-arrow-left"></i> Hub
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-0 text-dark">
+          Coach {{ handoff.coach.coach_number }} Passenger Reservation Roster
+        </h1>
+        <div class="text-secondary small font-mono">
+          Train {{ handoff.train.train_number }} ({{ handoff.train.train_name }}) · {{ handoff.shift }} Shift · {{ handoff.coach.coach_type }} Tier
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white" onclick="window.print()">
+        <i class="bi bi-printer"></i> Print Manifest
+      </button>
+      <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+        <i class="bi bi-qr-code-scan"></i> Issue Linen
+      </a>
+      <a href="{% url 'attendant_collect' %}" class="btn btn-sm btn-warning text-dark fw-bold d-inline-flex align-items-center gap-1">
+        <i class="bi bi-box-seam-fill"></i> Collect Linen
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary KPI Cards -->
+  <div class="row g-3">
+    <div class="col-6 col-md-3">
+      <div class="p-3 bg-white rounded-3 border shadow-xs d-flex align-items-center justify-content-between">
+        <div>
+          <div class="text-secondary small fw-semibold">Coach Capacity</div>
+          <div class="h3 fw-bold font-mono text-dark mb-0 mt-1">{{ total_passengers }}</div>
+          <div class="text-muted small">Booked Berths</div>
+        </div>
+        <div class="p-3 rounded-circle bg-primary bg-opacity-10 text-primary fs-4">
+          <i class="bi bi-people-fill"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+      <div class="p-3 bg-white rounded-3 border shadow-xs d-flex align-items-center justify-content-between">
+        <div>
+          <div class="text-secondary small fw-semibold">Linen Issued</div>
+          <div class="h3 fw-bold font-mono text-success mb-0 mt-1">{{ issued_count }}</div>
+          <div class="text-muted small">Kits Delivered</div>
+        </div>
+        <div class="p-3 rounded-circle bg-success bg-opacity-10 text-success fs-4">
+          <i class="bi bi-check-circle-fill"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+      <div class="p-3 bg-white rounded-3 border shadow-xs d-flex align-items-center justify-content-between">
+        <div>
+          <div class="text-secondary small fw-semibold">Boarding Now</div>
+          <div class="h3 fw-bold font-mono text-warning mb-0 mt-1">{{ boarding_count }}</div>
+          <div class="text-muted small">Awaiting Service</div>
+        </div>
+        <div class="p-3 rounded-circle bg-warning bg-opacity-10 text-warning fs-4">
+          <i class="bi bi-person-walking"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+      <div class="p-3 bg-white rounded-3 border shadow-xs d-flex align-items-center justify-content-between">
+        <div>
+          <div class="text-secondary small fw-semibold">Deboarding (< 20m)</div>
+          <div class="h3 fw-bold font-mono text-danger mb-0 mt-1">{{ deboarding_count }}</div>
+          <div class="text-muted small">{{ upcoming_station|truncatechars:18 }}</div>
+        </div>
+        <div class="p-3 rounded-circle bg-danger bg-opacity-10 text-danger fs-4">
+          <i class="bi bi-alarm-fill"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Passenger Roster Table Card -->
+  <div class="app-card shadow-sm border p-4">
+    
+    <!-- Filter & Search Controls -->
+    <div class="row g-3 align-items-center justify-content-between mb-3 pb-3 border-bottom">
+      <div class="col-md-5">
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0 text-muted">
+            <i class="bi bi-search"></i>
+          </span>
+          <input 
+            type="text" 
+            id="rosterSearchInput" 
+            class="form-control border-start-0 ps-0" 
+            placeholder="Search by Berth, Name, PNR, or Destination..." 
+            onkeyup="filterRoster()"
+          >
+        </div>
+      </div>
+
+      <div class="col-md-7 d-flex justify-content-md-end flex-wrap gap-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Roster filters">
+          <button type="button" class="btn btn-outline-secondary active fw-semibold" id="filterBtnAll" onclick="setFilter('all')">
+            All ({{ total_passengers }})
+          </button>
+          <button type="button" class="btn btn-outline-secondary fw-semibold" id="filterBtnBoarding" onclick="setFilter('boarding')">
+            Boarding ({{ boarding_count }})
+          </button>
+          <button type="button" class="btn btn-outline-secondary fw-semibold" id="filterBtnIssued" onclick="setFilter('issued')">
+            Issued ({{ issued_count }})
+          </button>
+          <button type="button" class="btn btn-outline-secondary fw-semibold" id="filterBtnDeboarding" onclick="setFilter('deboarding')">
+            Deboarding Next ({{ deboarding_count }})
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Official Roster Table -->
+    <div class="table-responsive">
+      <table class="table align-middle table-hover mb-0" id="passengerRosterTable">
+        <thead>
+          <tr class="text-secondary small text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+            <th style="width: 110px;">Berth / Type</th>
+            <th>Passenger Details</th>
+            <th>PNR & Status</th>
+            <th>Journey & Schedule</th>
+            <th>Assigned Linen Item</th>
+            <th class="text-end" style="width: 170px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in passengers %}
+          <tr 
+            class="roster-row" 
+            id="row-p-{{ p.id }}"
+            data-berth="{{ p.berth }}"
+            data-name="{{ p.passenger_name|lower }}"
+            data-pnr="{{ p.pnr_number|lower }}"
+            data-dst="{{ p.destination_station|lower }}"
+            data-status="{{ p.status|lower }}"
+            data-deboarding="{% if p.is_deboarding_soon %}true{% else %}false{% endif %}"
+            data-issued="{% if p.has_issued_linen %}true{% else %}false{% endif %}"
+          >
+            <!-- Berth Column -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary text-white font-mono fs-6 px-2 py-1">
+                  {{ p.berth }}
+                </span>
+                <div class="small text-muted font-mono" style="font-size: 0.72rem;">{{ p.berth_type }}</div>
+              </div>
+            </td>
+
+            <!-- Passenger Details Column -->
+            <td>
+              <div class="fw-bold text-dark fs-6">{{ p.passenger_name }}</div>
+              <div class="small text-muted font-mono" style="font-size: 0.75rem;">
+                {% if p.passenger_age or p.passenger_gender %}
+                  {{ p.passenger_gender|default:"-" }} / {{ p.passenger_age|default:"-" }} yrs · 
+                {% endif %}
+                Coach {{ handoff.coach.coach_number }}
+              </div>
+            </td>
+
+            <!-- PNR & Status Column -->
+            <td>
+              <div class="font-mono fw-semibold text-dark">{{ p.masked_pnr }}</div>
+              <div>
+                {% if p.status == 'Issued' %}
+                  <span class="badge bg-success text-white font-mono px-2 py-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-check2 me-1"></i> Linen Issued
+                  </span>
+                {% elif p.status == 'Boarding now' %}
+                  <span class="badge bg-warning text-dark font-mono px-2 py-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-clock me-1"></i> Boarding now
+                  </span>
+                {% else %}
+                  <span class="badge bg-secondary text-white font-mono px-2 py-1" style="font-size: 0.72rem;">
+                    {{ p.status }}
+                  </span>
+                {% endif %}
+
+                {% if p.is_deboarding_soon %}
+                  <span class="badge bg-danger text-white font-mono ms-1" style="font-size: 0.7rem;">
+                    <i class="bi bi-alarm me-1"></i>Deboarding ~18m
+                  </span>
+                {% endif %}
+              </div>
+            </td>
+
+            <!-- Journey & Schedule Column -->
+            <td>
+              <div class="small text-dark">
+                <i class="bi bi-geo-alt text-danger me-1"></i><strong>{{ p.destination_station }}</strong>
+              </div>
+              <div class="small text-muted font-mono" style="font-size: 0.72rem;">
+                Dep: {{ p.departure_time|default:"20:15" }} · Arr: {{ p.expected_arrival_time|default:"06:20" }}
+              </div>
+            </td>
+
+            <!-- Assigned Linen Column -->
+            <td>
+              {% if p.assigned_linen %}
+                <div class="d-flex flex-column gap-1">
+                  {% for item in p.assigned_linen %}
+                    <span class="badge {% if item.is_returned %}bg-secondary{% else %}bg-primary{% endif %} font-mono text-start py-1 px-2" style="font-size: 0.72rem;">
+                      {{ item.type }}: {{ item.code }} {% if item.is_returned %}✓ (Returned){% endif %}
+                    </span>
+                  {% endfor %}
+                </div>
+              {% elif p.has_issued_linen %}
+                <span class="badge bg-success font-mono">
+                  <i class="bi bi-check-circle me-1"></i>Kit Issued
+                </span>
+              {% else %}
+                <span class="text-muted small font-mono">
+                  <i class="bi bi-dash-circle me-1"></i>No linen scanned yet
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Action Column -->
+            <td class="text-end">
+              {% if p.is_deboarding_soon %}
+                <a href="{% url 'attendant_collect' %}?berth={{ p.berth }}&code={{ p.primary_linen_code|default:'BL-20561' }}" class="btn btn-sm btn-warning text-dark fw-bold d-inline-flex align-items-center gap-1 shadow-xs">
+                  <i class="bi bi-qr-code-scan"></i> Collect Linen
+                </a>
+              {% elif p.status == 'Issued' or p.has_issued_linen %}
+                <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1">
+                  <i class="bi bi-check2"></i> Verified
+                </a>
+              {% else %}
+                <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+                  <i class="bi bi-qr-code"></i> Issue Linen
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-5 text-muted">
+              <i class="bi bi-people display-4 d-block text-secondary opacity-50 mb-2"></i>
+              No passengers registered for Coach {{ handoff.coach.coach_number }}.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- No Search Results Indicator -->
+    <div id="noResultsMsg" class="text-center py-4 text-muted" style="display: none;">
+      <i class="bi bi-search fs-2 d-block text-secondary opacity-50 mb-2"></i>
+      No passengers match your search or filter criteria.
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let activeFilter = 'all';
+
+  function setFilter(filterType) {
+    activeFilter = filterType;
+    ['All', 'Boarding', 'Issued', 'Deboarding'].forEach(f => {
+      const btn = document.getElementById('filterBtn' + f);
+      if (btn) {
+        if (f.toLowerCase() === filterType) {
+          btn.classList.add('active', 'btn-primary');
+          btn.classList.remove('btn-outline-secondary');
+        } else {
+          btn.classList.remove('active', 'btn-primary');
+          btn.classList.add('btn-outline-secondary');
+        }
+      }
+    });
+    filterRoster();
+  }
+
+  function filterRoster() {
+    const q = (document.getElementById('rosterSearchInput').value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.roster-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const berth = row.getAttribute('data-berth') || '';
+      const name = row.getAttribute('data-name') || '';
+      const pnr = row.getAttribute('data-pnr') || '';
+      const dst = row.getAttribute('data-dst') || '';
+      const status = row.getAttribute('data-status') || '';
+      const isDeboarding = row.getAttribute('data-deboarding') === 'true';
+      const isIssued = row.getAttribute('data-issued') === 'true';
+
+      const matchesSearch = !q || berth.includes(q) || name.includes(q) || pnr.includes(q) || dst.includes(q);
+      
+      let matchesFilter = true;
+      if (activeFilter === 'boarding') {
+        matchesFilter = status.includes('boarding');
+      } else if (activeFilter === 'issued') {
+        matchesFilter = isIssued || status.includes('issued');
+      } else if (activeFilter === 'deboarding') {
+        matchesFilter = isDeboarding;
+      }
+
+      if (matchesSearch && matchesFilter) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    const noResults = document.getElementById('noResultsMsg');
+    if (noResults) {
+      noResults.style.display = (visibleCount === 0 && rows.length > 0) ? 'block' : 'none';
+    }
+  }
+</script>
+{% endblock %}

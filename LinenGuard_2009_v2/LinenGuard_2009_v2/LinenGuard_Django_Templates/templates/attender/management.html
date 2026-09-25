@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Attender Jobs - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-person-workspace text-primary me-2"></i>ATTENDER SUPERVISION</h3>
+    <p class="text-muted small mb-0">Review staff workload and assign train-coach collection jobs.</p>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white py-3">
+    <h5 class="fw-bold mb-0"><i class="bi bi-send-check text-success me-2"></i>Assign Collection Job</h5>
+  </div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Attender</label>
+        <select name="attender_id" class="form-select" required>
+          <option value="">Select attender</option>
+          {% for attender in attenders %}
+          <option value="{{ attender.id }}">{{ attender.get_full_name|default:attender.username }} ({{ attender.profile.badge_number|default:"No badge" }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Train</label>
+        <select name="train_id" id="management-train" class="form-select" required>
+          <option value="">Select train</option>
+          {% for train in trains %}
+          <option value="{{ train.id }}">{{ train.train_number }} - {{ train.train_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Coach</label>
+        <select name="coach_id" id="management-coach" class="form-select" required>
+          <option value="">Select train first</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">Expected linen</label>
+        <input type="number" name="expected_quantity" class="form-control" min="0" value="0" required>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <button class="btn btn-primary w-100" type="submit" title="Assign job"><i class="bi bi-check2"></i></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white py-3"><h5 class="fw-bold mb-0"><i class="bi bi-people text-primary me-2"></i>Attender Details</h5></div>
+  <div class="table-responsive">
+    <table class="table table-hover table-railway mb-0">
+      <thead><tr><th>Attender</th><th>Badge</th><th>Email</th><th>Active jobs</th><th>Completed jobs</th><th>Last assignment</th></tr></thead>
+      <tbody>
+        {% for row in attender_rows %}
+        <tr>
+          <td class="fw-semibold">{{ row.user.get_full_name|default:row.user.username }}</td>
+          <td><span class="badge bg-light text-dark border">{{ row.user.profile.badge_number|default:"-" }}</span></td>
+          <td>{{ row.user.email|default:"-" }}</td>
+          <td><span class="badge bg-warning text-dark">{{ row.active_jobs }}</span></td>
+          <td><span class="badge bg-success">{{ row.completed_jobs }}</span></td>
+          <td class="small">{% if row.last_job %}Train {{ row.last_job.train.train_number }} / Coach {{ row.last_job.coach.coach_number }}{% else %}No jobs yet{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="text-center py-4 text-muted">No attenders found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3"><h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i>Collection Jobs</h5></div>
+  <div class="table-responsive">
+    <table class="table table-hover table-railway mb-0">
+      <thead><tr><th>Attender</th><th>Train</th><th>Coach</th><th>Expected</th><th>Collected</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for session in sessions %}
+        <tr>
+          <td>{{ session.attender.username }}</td><td>{{ session.train.train_number }}</td><td>{{ session.coach.coach_number }}</td>
+          <td>{{ session.expected_quantity }}</td><td class="text-success fw-bold">{{ session.scanned_quantity }}</td>
+          <td><span class="badge {% if session.status == 'IN_PROGRESS' %}bg-warning text-dark{% elif session.status == 'COMPLETED' %}bg-success{% else %}bg-danger{% endif %}">{{ session.get_status_display }}</span></td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="text-center py-4 text-muted">No collection jobs assigned yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const trainSelect = document.getElementById('management-train');
+  const coachSelect = document.getElementById('management-coach');
+  trainSelect.addEventListener('change', function () {
+    coachSelect.innerHTML = '<option value="">Loading coaches...</option>';
+    if (!this.value) return;
+    fetch(`/api/trains/${this.value}/coaches/`)
+      .then(response => response.json())
+      .then(coaches => {
+        coachSelect.innerHTML = '<option value="">Select coach</option>';
+        coaches.forEach(coach => {
+          coachSelect.insertAdjacentHTML('beforeend', `<option value="${coach.id}">${coach.coach_number} (${coach.coach_type})</option>`);
+        });
+      });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ linen.linen_code }} Details - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy">
+      <span class="font-monospace text-primary">{{ linen.linen_code }}</span> — {{ linen.linen_type }}
+    </h3>
+    <p class="text-muted small mb-0">Item Digital Identification & Checkpoint Summary</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'linen_lifecycle' linen.linen_code %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-clock-history me-1"></i>View Lifecycle Timeline
+    </a>
+    <a href="{% url 'linen_qr_print' linen.linen_code %}" target="_blank" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-printer me-1"></i>Print QR Label
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Item Status & Checkpoint -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 fw-bold">
+        <i class="bi bi-info-circle text-primary me-2"></i>Item Specifications & Current Location
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <span class="text-muted small d-block">Linen Code</span>
+            <span class="fs-5 fw-bold font-monospace">{{ linen.linen_code }}</span>
+          </div>
+          <div class="col-md-4">
+            <span class="text-muted small d-block">Linen Type</span>
+            <span class="fs-5 fw-semibold">{{ linen.linen_type }}</span>
+          </div>
+          <div class="col-md-4">
+            <span class="text-muted small d-block">Status</span>
+            <span class="badge {% if linen.status == 'UNACCOUNTED' %}bg-danger{% elif linen.status == 'RETURNED' %}bg-success{% elif linen.status == 'ISSUED' %}bg-primary{% else %}bg-secondary{% endif %} fs-6">
+              {{ linen.get_status_display }}
+            </span>
+          </div>
+
+          <div class="col-md-6">
+            <span class="text-muted small d-block">Current Physical Location</span>
+            <span class="fw-semibold text-dark">{{ linen.current_location }}</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-muted small d-block">Registered At</span>
+            <span class="text-muted">{{ linen.created_at|date:"d M Y, H:i" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last Verified Checkpoint Callout Card -->
+    <div class="checkpoint-card mb-4 shadow-sm">
+      <div class="d-flex align-items-center mb-2">
+        <i class="bi bi-geo-alt-fill text-warning fs-4 me-2"></i>
+        <h5 class="fw-bold mb-0 text-dark">LAST VERIFIED CHECKPOINT</h5>
+      </div>
+      <p class="text-muted small mb-3">
+        Identifies the last confirmed location and operational stage where this item was physically scanned.
+      </p>
+
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <span class="text-muted small d-block">Verified Stage</span>
+          <span class="fw-bold text-dark fs-6">{{ checkpoint.stage }}</span>
+        </div>
+        <div class="col-sm-6">
+          <span class="text-muted small d-block">Verified Location</span>
+          <span class="fw-bold text-primary fs-6">{{ checkpoint.location }}</span>
+        </div>
+        <div class="col-sm-6">
+          <span class="text-muted small d-block">Timestamp</span>
+            <span class="fw-semibold text-muted">{{ checkpoint.timestamp|date:"d M Y, h:i A" }}</span>
+        </div>
+        <div class="col-sm-6">
+          <span class="text-muted small d-block">Next Expected Operational Event</span>
+          <span class="fw-bold text-danger">{{ checkpoint.next_expected }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active / Last Assignment -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-white py-3 fw-bold">
+        <i class="bi bi-ticket-perforated text-primary me-2"></i>Journey Assignment Details
+      </div>
+      <div class="card-body">
+        {% if latest_assignment %}
+        <div class="row g-3">
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Train Number</span>
+            <span class="fw-bold">{{ latest_assignment.train.train_number }} ({{ latest_assignment.train.train_name }})</span>
+          </div>
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Coach / Berth</span>
+            <span class="fw-bold text-primary">Coach {{ latest_assignment.coach.coach_number }} / Berth {{ latest_assignment.berth }}</span>
+          </div>
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Passenger Reference</span>
+            <span class="badge bg-light text-dark border">{{ latest_assignment.passenger_reference }}</span>
+          </div>
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Expected Collection</span>
+            <span class="text-muted">{{ latest_assignment.expected_collection_time|date:"h:i A" }}</span>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-muted py-2">No active journey assignment for this item.</div>
+        <a href="{% url 'assign_linen' %}?code={{ linen.linen_code }}" class="btn btn-sm btn-outline-primary mt-2">
+          <i class="bi bi-box-arrow-in-up-right me-1"></i>Assign to Journey
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Printable QR Code -->
+  <div class="col-lg-4 text-center">
+    <div class="card shadow-sm border-0 p-4">
+      <h6 class="fw-bold mb-3 text-muted">Digital Identification QR</h6>
+      <div class="qr-label-box mx-auto mb-3">
+        <img src="{{ qr_data_url }}" alt="QR Code" class="img-fluid qr-code-img">
+        <div class="fw-bold font-monospace mt-2">{{ linen.linen_code }}</div>
+        <div class="badge bg-light text-dark border">{{ linen.linen_type }}</div>
+      </div>
+      
+      <div class="d-grid gap-2">
+        <a href="{% url 'linen_qr_print' linen.linen_code %}" target="_blank" class="btn btn-outline-dark">
+          <i class="bi bi-printer me-1"></i> Print Label Tag
+        </a>
+        <a href="{% url 'linen_qr_image' linen.linen_code %}" download="{{ linen.linen_code }}.png" class="btn btn-outline-secondary">
+          <i class="bi bi-download me-1"></i> Download PNG
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

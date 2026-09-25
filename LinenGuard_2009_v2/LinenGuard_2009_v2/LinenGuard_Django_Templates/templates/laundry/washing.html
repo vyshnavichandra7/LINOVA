@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Washing & Reissue Workflow - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-arrow-repeat text-primary me-2"></i>WASHING & REISSUE WORKFLOW</h3>
+    <p class="text-muted small mb-0">Manage industrial washing, thermal disinfection, and train packaging batches</p>
+  </div>
+  <a href="{% url 'laundry_dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Station</a>
+</div>
+
+<div class="row g-4">
+  <!-- Column 1: Received at Laundry (Pending Wash) -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-building-down text-info me-1"></i>Received Items (Pending Wash)
+        </h6>
+        <span class="badge bg-info text-dark">{{ received_items.count }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Linen ID</th>
+                <th>Type</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in received_items %}
+              <tr id="row-{{ item.linen_code }}">
+                <td class="font-monospace fw-bold">{{ item.linen_code }}</td>
+                <td>{{ item.linen_type }}</td>
+                <td>
+                  <button class="btn btn-sm btn-warning fw-bold" onclick="advanceWorkflow('{{ item.linen_code }}', 'wash')">
+                    <i class="bi bi-play-circle me-1"></i> START WASHING
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-center py-4 text-muted">No items pending washing.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 2: In Washing Cycle (Pending Reissue) -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-warning">
+          <i class="bi bi-water me-1"></i>Currently in Washing Cycle
+        </h6>
+        <span class="badge bg-warning text-dark">{{ washing_items.count }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Linen ID</th>
+                <th>Type</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in washing_items %}
+              <tr id="row-{{ item.linen_code }}">
+                <td class="font-monospace fw-bold">{{ item.linen_code }}</td>
+                <td>{{ item.linen_type }}</td>
+                <td>
+                  <button class="btn btn-sm btn-success fw-bold" onclick="advanceWorkflow('{{ item.linen_code }}', 'reissue')">
+                    <i class="bi bi-check2-circle me-1"></i> MARK READY FOR REISSUE
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-center py-4 text-muted">No items currently undergoing wash cycle.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function advanceWorkflow(code, action) {
+    const url = action === 'wash' ? '{% url "api_laundry_wash" %}' : '{% url "api_laundry_reissue" %}';
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ qr_code: code })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        window.location.reload();
+      } else {
+        alert(data.message);
+      }
+    });
+  }
+</script>
+{% endblock %}

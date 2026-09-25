@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Lifecycle Timeline - {{ linen.linen_code }} - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy">
+      <i class="bi bi-clock-history text-primary me-2"></i>LINEN LIFECYCLE TIMELINE
+    </h3>
+    <p class="text-muted small mb-0">End-to-end traceability and breakpoint analysis for railway linen</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'linen_detail' linen.linen_code %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Linen Details
+    </a>
+    <a href="{% url 'linen_qr_print' linen.linen_code %}" target="_blank" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-printer me-1"></i>Print QR
+    </a>
+  </div>
+</div>
+
+<!-- Header Card -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body p-4">
+    <div class="row align-items-center">
+      <div class="col-md-3">
+        <span class="text-muted small d-block">Linen ID</span>
+        <h4 class="fw-bold font-monospace text-primary mb-0">{{ linen.linen_code }}</h4>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">Linen Type</span>
+        <h5 class="fw-semibold mb-0">{{ linen.linen_type }}</h5>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">Current Status</span>
+        <span class="badge {% if is_unaccounted %}bg-danger{% elif is_returned %}bg-success{% else %}bg-primary{% endif %} fs-6">
+          {{ linen.get_status_display }}
+        </span>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">Last Known Location</span>
+        <span class="fw-semibold text-dark">{{ linen.current_location }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Breakpoint / Checkpoint Intelligence Box (Sections 23, 28) -->
+<div class="card shadow-sm border-0 mb-4 {% if is_unaccounted %}border-danger border-start border-5{% else %}border-primary border-start border-5{% endif %}">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center mb-3">
+      {% if is_unaccounted %}
+        <i class="bi bi-exclamation-triangle-fill text-danger fs-3 me-2"></i>
+        <div>
+          <h5 class="fw-bold mb-0 text-danger">LIFECYCLE BREAKPOINT DETECTED</h5>
+          <span class="text-muted small">Expected transition from issuance to return was interrupted.</span>
+        </div>
+      {% else %}
+        <i class="bi bi-shield-check text-success fs-3 me-2"></i>
+        <div>
+          <h5 class="fw-bold mb-0 text-dark">LIFECYCLE CHECKPOINT VERIFICATION</h5>
+          <span class="text-muted small">Operational traceability confirmed across all recorded milestones.</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="row g-3 bg-light p-3 rounded-3">
+      <div class="col-md-3">
+        <span class="text-muted small d-block">LAST VERIFIED CHECKPOINT:</span>
+        <span class="fw-bold text-dark fs-6">{{ checkpoint.stage }}</span>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">CONFIRMED LOCATION:</span>
+        <span class="fw-bold text-primary fs-6">{{ checkpoint.location }}</span>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">TIMESTAMP:</span>
+        <span class="fw-semibold text-dark">{{ checkpoint.timestamp|date:"h:i A, d M Y" }}</span>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">NEXT EXPECTED EVENT:</span>
+        <span class="fw-bold {% if is_unaccounted %}text-danger{% else %}text-success{% endif %}">
+          {{ checkpoint.next_expected }}
+        </span>
+      </div>
+    </div>
+
+    {% if is_unaccounted %}
+    <div class="alert alert-danger bg-subtle-red border-danger mt-3 mb-0 small">
+      <i class="bi bi-shield-exclamation me-1"></i>
+      <strong>Traceability Notice:</strong> This item passed its last verified checkpoint at <strong>{{ checkpoint.location }}</strong> at <strong>{{ checkpoint.timestamp|date:"h:i A" }}</strong>. The expected return scan was not recorded during the collection window. LinenGuard flags this operational break without making assumptions of cause or personal accusation.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Visual Timeline (Section 24) -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3 fw-bold">
+    <i class="bi bi-bezier2 text-primary me-2"></i>Chronological Lifecycle Milestones
+  </div>
+  <div class="card-body p-4">
+
+    <div class="timeline">
+      {% for event in events %}
+      <div class="timeline-item">
+        <div class="timeline-marker {% if event.event_type == 'UNACCOUNTED' %}danger{% elif 'COLLECTED' in event.event_type or 'RETURNED' in event.event_type %}success{% elif 'ISSUED' in event.event_type %}info{% else %}secondary{% endif %}">
+          {% if event.event_type == 'UNACCOUNTED' %}
+            <i class="bi bi-x-lg"></i>
+          {% elif 'COLLECTED' in event.event_type or 'RETURNED' in event.event_type %}
+            <i class="bi bi-check-lg"></i>
+          {% elif 'ISSUED' in event.event_type %}
+            <i class="bi bi-person"></i>
+          {% else %}
+            <i class="bi bi-dot"></i>
+          {% endif %}
+        </div>
+
+        <div class="timeline-content">
+          <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <h6 class="fw-bold mb-1 {% if event.event_type == 'UNACCOUNTED' %}text-danger{% else %}text-dark{% endif %}">
+              {% if event.event_type == 'UNACCOUNTED' %}❌ {% else %}✓ {% endif %}{{ event.get_event_type_display }}
+            </h6>
+            <span class="badge bg-light text-muted border font-monospace">
+              {{ event.timestamp|date:"h:i A • d M Y" }}
+            </span>
+          </div>
+
+          <div class="text-muted small mt-1">
+            <i class="bi bi-geo-alt me-1 text-primary"></i><strong>Location:</strong> {{ event.location }}
+            {% if event.performed_by %}
+              &bull; <i class="bi bi-person-badge me-1"></i><strong>Staff:</strong> {{ event.performed_by.username }}
+            {% endif %}
+          </div>
+
+          {% if event.notes %}
+          <div class="small bg-light p-2 rounded mt-2 text-secondary">
+            {{ event.notes }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if is_unaccounted %}
+      <!-- Missing Next Event Indicator -->
+      <div class="timeline-item">
+        <div class="timeline-marker danger">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <div class="timeline-content border-danger bg-subtle-red">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0 text-danger">❌ RETURN SCAN NOT FOUND</h6>
+            <span class="badge bg-danger">LIFECYCLE BREAK</span>
+          </div>
+          <p class="small text-danger mb-0 mt-1">
+            Attender collection window closed without recorded QR verification.
+          </p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Attender Collection Dashboard - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-navy">
+      <i class="bi bi-handbag text-success me-2"></i>ATTENDER COLLECTION DASHBOARD
+    </h3>
+    <p class="text-muted small mb-0">On-train linen collection, QR validation, and coach sweep verification</p>
+  </div>
+  <a href="{% url 'linen_list' %}" class="btn btn-outline-success btn-sm">
+    <i class="bi bi-box-seam me-1"></i>Registered Linen
+  </a>
+</div>
+
+<!-- Linen supplied by Laundry -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="fw-bold mb-0"><i class="bi bi-box-seam text-success me-2"></i>Linen Available from Laundry</h5>
+      <span class="text-muted small">Select a registered linen item to assign it to a passenger using the PNR.</span>
+    </div>
+    <span class="badge bg-success">{{ available_linen|length }} available</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Linen ID</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Registered / Updated</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in available_linen %}
+          <tr>
+            <td class="font-monospace fw-bold text-primary">{{ item.linen_code }}</td>
+            <td>{{ item.linen_type }}</td>
+            <td><span class="badge {% if item.status == 'READY_FOR_REISSUE' %}bg-success{% else %}bg-secondary{% endif %}">{{ item.get_status_display }}</span></td>
+            <td class="small text-muted">{{ item.updated_at|date:"d M Y, H:i" }}</td>
+            <td class="text-end">
+              <a href="{% url 'assign_linen' %}?code={{ item.linen_code }}" class="btn btn-sm btn-success">
+                <i class="bi bi-box-arrow-in-up-right me-1"></i>Assign linen
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">No registered linen is waiting for assignment.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if active_session %}
+<!-- Active Session Overview (Section 14) -->
+<div class="card border-primary shadow-sm mb-4">
+  <div class="card-header bg-navy text-white py-3 d-flex justify-content-between align-items-center flex-wrap">
+    <div>
+      <span class="badge bg-success me-2"><i class="bi bi-broadcast me-1"></i>SESSION IN PROGRESS</span>
+      <strong class="fs-5">Train {{ active_session.train.train_number }} ({{ active_session.train.train_name }})</strong> &bull;
+      <strong class="text-warning">Coach {{ active_session.coach.coach_number }}</strong>
+    </div>
+    <div class="small text-light-50 mt-1 mt-md-0">
+      Attender: <strong>{{ active_session.attender.username|title }}</strong> &bull;
+      Date: <strong>{{ active_session.journey_date }}</strong>
+    </div>
+  </div>
+
+  <div class="card-body p-4">
+    <!-- 4 Key Stat Cards (Section 14) -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center border">
+          <span class="text-muted small fw-bold d-block">EXPECTED LINEN</span>
+          <h2 class="fw-bold text-dark my-1">{{ active_session.expected_quantity }}</h2>
+          <span class="text-muted extra-small">Issued to berths</span>
+        </div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center border-success">
+          <span class="text-success small fw-bold d-block">SCANNED & RETURNED</span>
+          <h2 class="fw-bold text-success my-1" id="stat-scanned-qty">{{ active_session.scanned_quantity }}</h2>
+          <span class="text-success extra-small">Verified by QR</span>
+        </div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center border-warning">
+          <span class="text-warning small fw-bold d-block">REMAINING TO SCAN</span>
+          <h2 class="fw-bold text-warning my-1" id="stat-remaining-qty">{{ active_session.expected_quantity|add:"-"|add:active_session.scanned_quantity }}</h2>
+          <span class="text-warning extra-small">Pending retrieval</span>
+        </div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center border-danger">
+          <span class="text-danger small fw-bold d-block">DISCREPANCY</span>
+          <h2 class="fw-bold text-danger my-1">{{ active_session.missing_quantity }}</h2>
+          <span class="text-danger extra-small">Unaccounted items</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="stat-card p-3 border-success d-flex justify-content-between align-items-center">
+          <div>
+            <span class="text-success small fw-bold d-block">COLLECTED FOR THIS COACH</span>
+            <span class="text-muted extra-small">Successfully scanned and returned</span>
+          </div>
+          <h2 class="fw-bold text-success mb-0">{{ collected_count }}</h2>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="stat-card p-3 border-warning d-flex justify-content-between align-items-center">
+          <div>
+            <span class="text-warning small fw-bold d-block">PENDING FOR THIS COACH</span>
+            <span class="text-muted extra-small">Assigned but not yet scanned</span>
+          </div>
+          <h2 class="fw-bold text-warning mb-0">{{ pending_count }}</h2>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i>Assigned Linen for Train {{ active_session.train.train_number }} / Coach {{ active_session.coach.coach_number }}</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-railway mb-0">
+            <thead>
+              <tr>
+                <th>Linen ID</th>
+                <th>Type</th>
+                <th>Berth</th>
+                <th>PNR</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for assignment in coach_assignments %}
+              <tr>
+                <td class="font-monospace fw-bold">{{ assignment.linen.linen_code }}</td>
+                <td>{{ assignment.linen.linen_type }}</td>
+                <td class="fw-bold">{{ assignment.berth }}</td>
+                <td class="font-monospace">{{ assignment.passenger_reference }}</td>
+                <td>
+                  <span class="badge {% if assignment.assignment_status == 'RETURNED' %}bg-success{% elif assignment.assignment_status == 'UNACCOUNTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                    {% if assignment.assignment_status == 'RETURNED' %}Collected{% elif assignment.assignment_status == 'UNACCOUNTED' %}Unaccounted{% else %}Pending{% endif %}
+                  </span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-center py-4 text-muted">No linen has been assigned to this coach yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Action Buttons (Section 14) -->
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
+      <a href="{% url 'attender_scanner' active_session.id %}" class="btn btn-success btn-lg px-4 py-3 fw-bold shadow">
+        <i class="bi bi-qr-code-scan me-2"></i> [ SCAN LINEN ]
+      </a>
+      <a href="{% url 'complete_collection' active_session.id %}" class="btn btn-outline-danger btn-lg px-4 py-3 fw-bold" onclick="return confirm('Are you sure you want to complete this collection session? Any unscanned items will be flagged as Unaccounted.');">
+        <i class="bi bi-check2-all me-2"></i> [ COMPLETE COLLECTION ]
+      </a>
+    </div>
+
+  </div>
+</div>
+{% else %}
+<!-- No Active Session Prompt -->
+<div class="card shadow-sm border-0 text-center p-5 mb-4">
+  <div class="display-5 text-muted mb-3"><i class="bi bi-handbag"></i></div>
+  <h4 class="fw-bold text-dark">No Active Collection Session</h4>
+  <p class="text-muted mx-auto" style="max-width: 500px;">
+    Start an attender collection sweep for an arriving train and coach to verify returned passenger linen items using the QR scanner.
+  </p>
+  <div>
+    <a href="{% url 'start_collection' %}" class="btn btn-primary btn-lg fw-bold px-4">
+      <i class="bi bi-play-circle me-2"></i> START COLLECTION
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent Collection Sessions -->
+{% if recent_session %}
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3 fw-bold">
+    <i class="bi bi-clock-history text-primary me-2"></i>Recent Completed Collection Sessions
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Train</th>
+            <th>Coach</th>
+            <th>Attender</th>
+            <th>Date & Time</th>
+            <th>Expected</th>
+            <th>Scanned</th>
+            <th>Unaccounted</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="fw-bold">{{ recent_session.train.train_number }}</td>
+            <td><span class="badge bg-primary">{{ recent_session.coach.coach_number }}</span></td>
+            <td>{{ recent_session.attender.username }}</td>
+            <td class="small text-muted">{{ recent_session.started_at|date:"d M Y, H:i" }}</td>
+            <td>{{ recent_session.expected_quantity }}</td>
+            <td class="text-success fw-bold">{{ recent_session.scanned_quantity }}</td>
+            <td class="{% if recent_session.missing_quantity > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+              {{ recent_session.missing_quantity }}
+            </td>
+            <td>
+              <span class="badge {% if recent_session.status == 'COMPLETED' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                {{ recent_session.get_status_display }}
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'collection_summary' recent_session.id %}" class="btn btn-sm btn-outline-secondary">
+                View Summary
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

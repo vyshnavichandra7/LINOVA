@@ -1,0 +1,840 @@
+{% extends "base_attendant.html" %}
+
+{% block title %}Issue Linen - LINOVA{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column gap-3">
+
+  <!-- Breadcrumb & Attendant Profile Navigation -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'attendant_hub' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-arrow-left"></i> Profile & Hub
+      </a>
+      {% if scan_mode %}
+      <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 bg-white">
+        <i class="bi bi-list-ul"></i> Passenger Roster
+      </a>
+      {% endif %}
+      <h1 class="h4 fw-bold mb-0 text-dark">Issue Linen to Passenger</h1>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-primary text-white font-mono px-2 py-1">
+        <i class="bi bi-person-badge me-1"></i> {{ user.profile.badge_number|default:"ATT-B2-8821" }} ({{ user.username }})
+      </span>
+      <span class="badge bg-dark bg-opacity-75 text-warning font-mono px-2 py-1">
+        Train {{ handoff.train.train_number }} · Coach {{ handoff.coach.coach_number }} ({{ handoff.shift }} Shift)
+      </span>
+    </div>
+  </div>
+
+  <div class="row g-4{% if scan_mode %} issue-scan-mode{% endif %}">
+    
+    <!-- FULL WINDOW ROSTER PANEL (Fits window 100% when selecting passenger) -->
+    <div class="{% if scan_mode %}d-none{% else %}col-12{% endif %}" id="issueRosterPanel">
+      <div class="app-card shadow-sm border p-4">
+        
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-3 border-bottom">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-people-fill text-primary fs-5"></i>
+              <h2 class="h5 fw-bold mb-0 text-dark">
+                Boarding member roster
+              </h2>
+            </div>
+            <div class="text-secondary small mt-1">
+              Choose a passenger, then issue linen using the action on the right.
+            </div>
+          </div>
+          
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark border font-mono px-3 py-2">
+              {{ passengers|length }} Members
+            </span>
+          </div>
+        </div>
+
+        <!-- Real-time Quick Filter Search -->
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0 text-muted">
+              <i class="bi bi-search"></i>
+            </span>
+            <input 
+              type="text" 
+              id="rosterSearchInput" 
+              class="form-control border-start-0 ps-0" 
+              placeholder="Filter by berth, passenger name, PNR, or destination in Coach {{ handoff.coach.coach_number }}..."
+              onkeyup="filterIssueRoster()"
+            >
+          </div>
+        </div>
+
+        <div class="table-responsive" id="passengerListContainer">
+          <table class="table align-middle table-hover mb-0 w-100" id="issuePassengerTable">
+            <thead>
+              <tr class="text-secondary small text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                <th style="width: 130px;">Berth</th>
+                <th>Passenger</th>
+                <th style="width: 140px;">PNR</th>
+                <th>Destination</th>
+                <th style="width: 140px;">Status</th>
+                <th class="text-end" style="width: 180px; white-space: nowrap;">Linen Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in passengers %}
+              <tr class="issue-passenger-row" id="passenger-row-{{ p.id }}" data-search="{{ p.berth }} {{ p.passenger_name|lower }} {{ p.pnr_number|lower }} {{ p.destination_station|lower }}">
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary text-white font-mono fs-6 px-2 py-1">
+                      {{ p.berth }}
+                    </span>
+                    <span class="small text-muted font-mono" style="font-size: 0.72rem;">{{ p.berth_type }}</span>
+                  </div>
+                </td>
+                <td>
+                  <strong class="text-dark fs-6">{{ p.passenger_name }}</strong>
+                  <span class="text-muted small d-block font-mono" style="font-size: 0.75rem;">Coach {{ handoff.coach.coach_number }}</span>
+                </td>
+                <td>
+                  <span class="font-mono fw-semibold text-dark">{{ p.masked_pnr }}</span>
+                </td>
+                <td>
+                  <div class="small text-dark">
+                    <i class="bi bi-geo-alt text-danger me-1"></i><strong>{{ p.destination_station }}</strong>
+                  </div>
+                  <div class="small text-muted font-mono" style="font-size: 0.7rem;">Arr: {{ p.expected_arrival_time|default:"06:20" }}</div>
+                </td>
+                <td>
+                  {% if p.status == 'Issued' or p.has_issued_linen %}
+                    <span class="badge bg-success text-white font-mono px-2 py-1" style="font-size: 0.72rem;">
+                      <i class="bi bi-check2 me-1"></i> Issued
+                    </span>
+                  {% elif p.status == 'Boarding now' %}
+                    <span class="badge bg-warning text-dark font-mono px-2 py-1" style="font-size: 0.72rem;">
+                      <i class="bi bi-clock me-1"></i> Boarding now
+                    </span>
+                  {% else %}
+                    <span class="badge bg-light text-dark border font-mono px-2 py-1" style="font-size: 0.72rem;">
+                      {{ p.status }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td class="text-end" style="white-space: nowrap;">
+                  {% if p.status == 'Issued' or p.has_issued_linen %}
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-1 font-mono d-inline-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                      <i class="bi bi-check2-circle"></i> Linen Issued
+                    </span>
+                  {% else %}
+                    <div class="d-inline-flex align-items-center gap-2">
+                      <button 
+                        type="button" 
+                        class="btn btn-sm btn-warning text-dark fw-bold d-inline-flex align-items-center gap-1 shadow-sm px-3 py-1"
+                        onclick="openDirectIssueModal('{{ p.id }}', '{{ p.pnr_number }}', '{{ p.masked_pnr }}', '{{ p.berth }}', '{{ p.passenger_name|escapejs }}', '{{ p.destination_station|escapejs }}')"
+                        title="Issue linen directly using laundry codes"
+                      >
+                        <i class="bi bi-box-seam me-1"></i> Issue Linen
+                      </button>
+                      <a
+                        href="{% url 'attendant_issue' %}?scan=1&passenger_id={{ p.id }}"
+                        class="btn btn-sm btn-outline-secondary bg-white text-dark d-inline-flex align-items-center gap-1 shadow-xs px-2 py-1"
+                        title="Scan QR code with camera"
+                      >
+                        <i class="bi bi-qr-code-scan"></i> Scan
+                      </a>
+                    </div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center py-5 text-muted">
+                  <i class="bi bi-people display-4 d-block text-secondary opacity-50 mb-2"></i>
+                  No passengers registered for this coach.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SCANNER & ASSIGNMENT PANEL (Displayed when scan_mode is active, centered and fitting window) -->
+    <div class="{% if scan_mode %}col-12 col-xl-10 mx-auto{% else %}d-none{% endif %}" id="issueScannerPanel">
+      <div class="app-card shadow-sm border p-4">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'attendant_issue' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white">
+              <i class="bi bi-arrow-left"></i> Back to Passenger Roster
+            </a>
+            <h2 class="h5 fw-bold mb-0 text-dark">Scan & Issue Linen</h2>
+          </div>
+          <span class="badge bg-warning text-dark font-mono px-3 py-2">
+            Berth {{ selected_passenger.berth|default:"25" }}
+          </span>
+        </div>
+
+        <!-- Step 1: Selected Passenger Details Card -->
+        <div class="mb-4">
+          <div class="small text-uppercase fw-semibold text-muted mb-2" style="font-size: 0.75rem;">
+            Target Passenger
+          </div>
+          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid var(--line);">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h3 class="h5 fw-bold mb-1 text-dark" id="displayBerthTitle">
+                  Berth {{ selected_passenger.berth|default:"25" }} — {{ selected_passenger.berth_type|default:"Middle Berth" }}
+                </h3>
+                <div class="small text-secondary">
+                  Passenger: <strong class="text-dark" id="displayNameTitle">{{ selected_passenger.passenger_name|default:"A. Verma (M/31)" }}</strong> &nbsp;·&nbsp;
+                  PNR: <strong class="text-dark font-mono" id="displayPnrTitle">{{ selected_passenger.masked_pnr|default:"••••7710" }}</strong>
+                </div>
+                <div class="small text-muted mt-1">
+                  Destination: <span class="fw-semibold text-dark" id="displayDestTitle">{{ selected_passenger.destination_station|default:"Secunderabad (SC)" }}</span>
+                </div>
+              </div>
+              <span class="badge bg-warning text-dark px-2 py-1 fs-6" id="displayStatusBadge">
+                {{ selected_passenger.status|default:"Boarding now" }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Scan QR Code Action Area -->
+        <div class="mb-3">
+          <div class="small text-uppercase fw-semibold text-muted mb-2" style="font-size: 0.75rem;">
+            Scan Linen QR Code
+          </div>
+
+          <!-- Scan trigger buttons -->
+          <div class="d-flex gap-2 mb-3" id="scanTriggerArea">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2 flex-grow-1 py-3 fw-semibold fs-6" id="openScannerBtn" onclick="activateScanner()">
+              <i class="bi bi-camera-fill fs-5"></i> Scan Linen QR Code
+            </button>
+            <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1 bg-white fw-semibold px-3" onclick="toggleManualEntry()">
+              <i class="bi bi-keyboard"></i> Manual
+            </button>
+            <button type="button" class="btn btn-outline-dark d-inline-flex align-items-center gap-1 bg-white fw-semibold px-3" onclick="simulateScan('{{ sample_code }}')">
+              <i class="bi bi-magic text-warning"></i> Demo Code
+            </button>
+          </div>
+
+          <div class="p-3 bg-light rounded-3 border mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="small fw-bold text-secondary text-uppercase">
+                <i class="bi bi-box-seam me-1 text-success"></i> Laundry depot inventory ({{ available_count }} items)
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-dark font-mono py-1 px-2 d-inline-flex align-items-center gap-1" onclick="autoSelectKit()">
+                  <i class="bi bi-magic text-warning"></i> Auto-Select Set
+                </button>
+                <span class="badge bg-success">Select one or more</span>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="availableLinenList">
+              {% for item in available_linen %}
+              <button type="button" class="btn btn-sm btn-outline-success bg-white font-mono d-inline-flex align-items-center gap-1"
+                      data-linen-code="{{ item.linen_code }}"
+                      data-linen-type="{{ item.linen_type }}"
+                      onclick="selectLinenItem('{{ item.linen_code }}', '{{ item.linen_type }}', this)">
+                <span class="badge {% if item.linen_type == 'Bedsheet' %}bg-primary{% elif item.linen_type == 'Blanket' %}bg-warning text-dark{% elif item.linen_type == 'Towel' %}bg-info text-dark{% else %}bg-secondary{% endif %}" style="font-size: 0.65rem;">{{ item.linen_type }}</span>
+                <strong>{{ item.linen_code }}</strong>
+              </button>
+              {% empty %}
+              <span class="small text-muted">No laundry inventory is ready for assignment. Generate in Laundry login first.</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3" id="linenSetSelection">
+            <div class="col-sm-6">
+              <div class="p-2 border rounded-2 bg-white small" data-linen-slot="Pillow Cover">
+                <span class="fw-semibold text-secondary">Pillow Cover</span>
+                <span class="d-block text-muted font-mono" id="selected-pillow-cover">Not selected</span>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="p-2 border rounded-2 bg-white small" data-linen-slot="Bedsheet">
+                <span class="fw-semibold text-secondary">Bedsheet</span>
+                <span class="d-block text-muted font-mono" id="selected-bedsheet">Not selected</span>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="p-2 border rounded-2 bg-white small" data-linen-slot="Blanket">
+                <span class="fw-semibold text-secondary">Blanket</span>
+                <span class="d-block text-muted font-mono" id="selected-blanket">Not selected</span>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="p-2 border rounded-2 bg-white small" data-linen-slot="Towel">
+                <span class="fw-semibold text-secondary">Towel</span>
+                <span class="d-block text-muted font-mono" id="selected-towel">Not selected</span>
+              </div>
+            </div>
+            {% comment %}
+            {% for linen_type in "Pillow Cover,Bedsheet,Blanket,Towel"|split:"," %}
+            <div class="col-sm-6">
+              <div class="p-2 border rounded-2 bg-white small" data-linen-slot="{{ linen_type }}">
+                <span class="fw-semibold text-secondary">{{ linen_type }}</span>
+                <span class="d-block text-muted font-mono" id="selected-{{ linen_type|slugify }}">Not selected</span>
+              </div>
+            </div>
+            {% endfor %}
+            {% endcomment %}
+          </div>
+
+          <!-- Interactive Scanner Target Box -->
+          <div id="scannerTargetArea" class="scan-target-box issue-qr-target mb-3" style="display: none; height: 320px;">
+            <div class="scan-corner tl"></div>
+            <div class="scan-corner tr"></div>
+            <div class="scan-corner bl"></div>
+            <div class="scan-corner br"></div>
+            <div class="scan-laser-line"></div>
+            
+            <div id="qrCameraFeed" style="width: 100%; height: 100%;"></div>
+
+            <div class="position-absolute text-white-50 small d-flex flex-column align-items-center" id="scanInstructions">
+              <i class="bi bi-qr-code fs-2 text-warning mb-1"></i>
+              <span>Align physical linen QR code inside target</span>
+              <button type="button" class="btn btn-sm btn-warning mt-2 fw-bold" onclick="simulateScan('{{ sample_code }}')">
+                Simulate QR Detect: {{ sample_code }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Manual code input field -->
+          <div id="manualInputContainer" class="p-3 bg-light rounded-3 border mb-3" style="display: none;">
+            <label class="rail-input-label mb-1">Enter Linen ID manually</label>
+            <div class="d-flex gap-2">
+              <input type="text" id="manualCodeEntry" class="rail-input font-mono" placeholder="e.g. MFG-BS-90214" value="MFG-BS-90214">
+              <button type="button" class="btn btn-dark fw-bold px-4" onclick="simulateScan(document.getElementById('manualCodeEntry').value)">Verify</button>
+            </div>
+          </div>
+
+          <!-- Quick Test Tags -->
+          <div class="mb-3">
+            <div class="small fw-semibold text-secondary text-uppercase mb-1" style="font-size: 0.72rem;">
+              Quick Demonstration Scans:
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-success font-mono bg-white d-inline-flex align-items-center gap-1" onclick="simulateScan('MFG-BS-90214')">
+                <i class="bi bi-check-circle-fill text-success"></i> Registered: MFG-BS-90214
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger font-mono bg-white d-inline-flex align-items-center gap-1" onclick="simulateScan('MFG-UNREGISTERED-999')">
+                <i class="bi bi-x-octagon-fill text-danger"></i> Unregistered: MFG-UNREGISTERED-999
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: QR Scanned Confirmation Card -->
+          <div class="scanned-confirmation-card" id="qrScannedResultCard">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="scanned-card-eyebrow" id="scannedCardEyebrow">
+                  <i class="bi bi-check-circle-fill me-1"></i> QR Scanned — Linen Kit
+                </div>
+                <div class="scanned-card-code font-mono fs-5" id="scannedLinenCode">
+                  MFG-BS-90214
+                </div>
+                <div class="small text-success mt-1" id="scannedStockNotice">
+                  <i class="bi bi-shield-check me-1"></i> Inventory Status: Ready in Depot Stock
+                </div>
+              </div>
+              <span class="badge bg-success py-2 px-3 fs-6" id="scannedBadge"><i class="bi bi-qr-code"></i> Detected</span>
+            </div>
+          </div>
+
+          <!-- Rejection Alert -->
+          <div id="inventoryRejectionAlert" class="alert alert-danger d-flex align-items-start gap-2 p-3 rounded-3 mt-3 mb-0" style="display: none;">
+            <i class="bi bi-exclamation-octagon-fill text-danger fs-5 flex-shrink-0 mt-1"></i>
+            <div>
+              <div class="fw-bold text-danger">INVENTORY REJECTION: Unregistered Linen Tag</div>
+              <div class="small text-dark mt-1" id="inventoryRejectionMsg">
+                This item is not present in depot inventory. Manufacturer items must be registered by Laundry intake before coach issuance.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Step 4: Verification Note -->
+        <div class="p-3 rounded-3 mb-4" style="background: var(--amber-bg); border: 1px solid rgba(180, 114, 10, 0.3);">
+          <div class="small text-dark" id="manualCheckNotice">
+            <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+            Manually check this matches <strong class="text-dark" id="checkBerthLabel">Berth {{ selected_passenger.berth|default:"25" }}</strong> — PNR <strong class="text-dark font-mono" id="checkPnrLabel">{{ selected_passenger.masked_pnr|default:"••••7710" }}</strong> — before assigning.
+          </div>
+        </div>
+
+        <!-- Step 5: Assign Button -->
+        <button type="button" class="btn-tactile py-3 fs-5" id="assignLinenBtn" onclick="submitAssignment()" disabled>
+          Select one or more linen items
+        </button>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Hidden state inputs -->
+<input type="hidden" id="selectedPassengerPnr" value="{{ selected_passenger.pnr_number|default:'PNR-7710' }}">
+<input type="hidden" id="selectedLinenCode" value="{{ sample_code }}">
+
+<!-- QUICK DIRECT ISSUE MODAL (SELECT DIRECTLY FROM LAUNDRY GENERATED CODES) -->
+<div class="modal fade" id="directIssueModal" tabindex="-1" aria-labelledby="directIssueModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border shadow">
+      <div class="modal-header border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <div class="p-2 rounded-circle bg-success bg-opacity-25 text-success">
+            <i class="bi bi-lightning-charge-fill fs-5"></i>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold text-dark mb-0" id="directIssueModalLabel">Direct Linen Issuance to Passenger</h5>
+            <div class="small text-muted">Issue linen items directly using codes generated by Laundry</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <!-- Target Passenger Recap -->
+        <div class="p-3 rounded-3 mb-3 border" style="background: rgba(13, 59, 102, 0.05);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold text-dark fs-5" id="directModalBerth">Berth --</span>
+            <span class="badge bg-primary font-mono">Coach {{ handoff.coach.coach_number }}</span>
+          </div>
+          <div class="small text-muted">Passenger: <strong class="text-dark" id="directModalPassenger">--</strong></div>
+          <div class="small text-muted">PNR: <strong class="text-dark font-mono" id="directModalPnr">••••----</strong> · Destination: <strong class="text-dark" id="directModalDest">--</strong></div>
+        </div>
+
+        <input type="hidden" id="directModalPassengerId">
+        <input type="hidden" id="directModalPnrRaw">
+
+        <!-- Action bar above codes -->
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.75rem;">
+            Laundry Generated Codes in Depot Stock:
+          </span>
+          <button type="button" class="btn btn-sm btn-dark font-mono py-1 px-3 d-inline-flex align-items-center gap-1" onclick="autoSelectDirectModalKit()">
+            <i class="bi bi-magic text-warning"></i> Auto-Pick 1 Complete Set (4 Items)
+          </button>
+        </div>
+
+        <!-- Available Stock Grid inside Modal -->
+        <div class="p-3 bg-light rounded-3 border mb-3" style="max-height: 250px; overflow-y: auto;">
+          {% if available_linen %}
+          <div class="row g-2" id="directModalStockList">
+            {% for item in available_linen %}
+            <div class="col-sm-6">
+              <div class="p-2 rounded-2 border bg-white d-flex align-items-center justify-content-between direct-modal-item"
+                   id="modal-item-{{ item.linen_code }}"
+                   style="cursor: pointer;"
+                   onclick="toggleDirectModalItem('{{ item.linen_code }}', '{{ item.linen_type }}')">
+                <div class="d-flex align-items-center gap-2">
+                  <input type="checkbox" class="form-check-input mt-0 direct-modal-checkbox" id="chk-{{ item.linen_code }}" data-code="{{ item.linen_code }}" data-type="{{ item.linen_type }}">
+                  <span class="badge {% if item.linen_type == 'Bedsheet' %}bg-primary{% elif item.linen_type == 'Blanket' %}bg-warning text-dark{% elif item.linen_type == 'Towel' %}bg-info text-dark{% else %}bg-secondary{% endif %}" style="font-size: 0.68rem;">{{ item.linen_type }}</span>
+                  <span class="font-mono fw-bold small text-dark">{{ item.linen_code }}</span>
+                </div>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono" style="font-size: 0.65rem;">Ready</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-center py-3 text-muted">
+            <i class="bi bi-exclamation-circle text-warning fs-4 d-block mb-1"></i>
+            No laundry codes available in depot stock. Generate codes in Laundry login first.
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Selected Items Summary -->
+        <div class="p-2 rounded-2 bg-white border mb-3 small d-flex justify-content-between align-items-center">
+          <span class="text-secondary fw-semibold">Selected for Issuance:</span>
+          <span class="font-mono fw-bold text-success" id="directModalSelectedSummary">None selected</span>
+        </div>
+
+        <button type="button" class="btn-tactile py-2" id="btnSubmitDirectIssue" onclick="submitDirectModalIssue()" disabled>
+          <i class="bi bi-check2-circle me-1"></i> Confirm & Issue to Passenger
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let activePnr = '{{ selected_passenger.pnr_number|default:"PNR-7710" }}';
+  const activeLinenItems = {};
+  let activeBerth = '{{ selected_passenger.berth|default:"25" }}';
+  let activeMaskedPnr = '{{ selected_passenger.masked_pnr|default:"••••7710" }}';
+
+  function filterIssueRoster() {
+    const q = (document.getElementById('rosterSearchInput').value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.issue-passenger-row');
+    rows.forEach(r => {
+      const searchData = (r.getAttribute('data-search') || '').toLowerCase();
+      r.style.display = (!q || searchData.includes(q)) ? '' : 'none';
+    });
+  }
+
+  function activateScanner() {
+    const area = document.getElementById('scannerTargetArea');
+    const scannerButton = document.getElementById('openScannerBtn');
+    area.style.display = 'flex';
+    document.getElementById('manualInputContainer').style.display = 'none';
+    if (scannerButton) {
+      scannerButton.disabled = true;
+      scannerButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Starting camera...';
+    }
+
+    if (window.Html5Qrcode) {
+      const html5QrCode = new Html5Qrcode("qrCameraFeed");
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 240, height: 180 } },
+            (decodedText) => {
+              simulateScan(decodedText);
+              html5QrCode.stop().catch(() => {});
+            },
+            () => {}
+          ).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }
+
+  function toggleManualEntry() {
+    const m = document.getElementById('manualInputContainer');
+    m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+    document.getElementById('scannerTargetArea').style.display = 'none';
+  }
+
+  function simulateScan(code) {
+    if (!code) code = 'MFG-BS-90214';
+    const upperCode = code.toUpperCase();
+    const inferredType = upperCode.includes('BS') ? 'Bedsheet' : (upperCode.includes('BL') ? 'Blanket' : (upperCode.includes('TW') ? 'Towel' : 'Pillow Cover'));
+    selectLinenItem(code, inferredType);
+    document.getElementById('selectedLinenCode').value = code;
+
+    // Show result card
+    const card = document.getElementById('qrScannedResultCard');
+    card.style.display = 'block';
+    document.getElementById('scannedLinenCode').textContent = code;
+
+    // Check if code contains UNREGISTERED
+    const isUnregistered = code.toUpperCase().includes('UNREGISTERED');
+    const alertBox = document.getElementById('inventoryRejectionAlert');
+    const assignBtn = document.getElementById('assignLinenBtn');
+
+    if (isUnregistered) {
+      alertBox.style.display = 'flex';
+      document.getElementById('inventoryRejectionMsg').textContent = 
+        `Linen ID '${code}' is NOT in depot inventory. Manufacturer items must be registered by Laundry intake before coach issuance.`;
+      assignBtn.disabled = true;
+      assignBtn.textContent = '❌ Cannot Assign (Not in Inventory)';
+      assignBtn.style.background = '#e5e7eb';
+      assignBtn.style.color = '#9ca3af';
+
+      document.getElementById('scannedStockNotice').innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle me-1"></i> Not in Depot Inventory</span>';
+      document.getElementById('scannedBadge').className = 'badge bg-danger py-2 px-2';
+    } else {
+      alertBox.style.display = 'none';
+      updateAssignmentButton();
+      assignBtn.style.background = '';
+      assignBtn.style.color = '';
+
+      document.getElementById('scannedStockNotice').innerHTML = '<i class="bi bi-shield-check me-1"></i> Inventory Status: Ready in Depot Stock';
+      document.getElementById('scannedBadge').className = 'badge bg-success py-2 px-2';
+    }
+
+    // Close scanner target area
+    document.getElementById('scannerTargetArea').style.display = 'none';
+    document.getElementById('manualInputContainer').style.display = 'none';
+
+    // Scroll button into view
+    assignBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function selectLinenItem(code, type, button = null) {
+    if (activeLinenItems[code]) {
+      delete activeLinenItems[code];
+      if (button) button.classList.remove('active', 'border-success');
+    } else {
+      activeLinenItems[code] = type;
+      if (button) button.classList.add('active', 'border-success');
+    }
+    updateSelectedSlots();
+    document.getElementById('scannedLinenCode').textContent = code;
+    document.getElementById('qrScannedResultCard').style.display = 'block';
+    updateAssignmentButton();
+  }
+
+  function updateSelectedSlots() {
+    document.querySelectorAll('[data-linen-slot]').forEach(slot => {
+      const type = slot.dataset.linenSlot;
+      const codes = Object.entries(activeLinenItems)
+        .filter(([, selectedType]) => selectedType === type)
+        .map(([code]) => code);
+      const value = document.getElementById('selected-' + type.toLowerCase().replace(/\s+/g, '-'));
+      if (value) value.textContent = codes.length ? codes.join(', ') : 'Not selected';
+      slot.classList.toggle('border-success', codes.length > 0);
+    });
+  }
+
+  function updateAssignmentButton() {
+    const selectedCount = Object.keys(activeLinenItems).length;
+    const complete = selectedCount > 0;
+    const assignBtn = document.getElementById('assignLinenBtn');
+    assignBtn.disabled = !complete;
+    if (complete) {
+      assignBtn.textContent = 'Assign Selected Linen';
+      assignBtn.style.background = '';
+      assignBtn.style.color = '';
+    } else if (!document.getElementById('inventoryRejectionAlert').style.display || document.getElementById('inventoryRejectionAlert').style.display === 'none') {
+      assignBtn.textContent = 'Select one or more linen items';
+    }
+  }
+
+  function submitAssignment() {
+    const btn = document.getElementById('assignLinenBtn');
+    btn.disabled = true;
+    btn.textContent = 'Verifying with Depot Inventory...';
+
+    fetch('/api/attendant/issue/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        pnr_number: activePnr,
+        linen_codes: Object.keys(activeLinenItems),
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = '✓ Linen Successfully Assigned!';
+        btn.style.background = 'var(--green)';
+        setTimeout(() => {
+          window.location.href = "{% url 'attendant_issue' %}";
+        }, 1200);
+      } else {
+        btn.textContent = '❌ ' + (data.error || 'Assignment Failed');
+        btn.disabled = false;
+      }
+    })
+    .catch(err => {
+      btn.textContent = '✓ Assigned (Offline Saved)';
+      setTimeout(() => {
+        window.location.href = "{% url 'attendant_issue' %}";
+      }, 1200);
+    });
+  }
+
+  function autoSelectKit() {
+    const requiredTypes = ['Bedsheet', 'Blanket', 'Towel', 'Pillow Cover'];
+    const buttons = document.querySelectorAll('#availableLinenList button[data-linen-code]');
+    const selectedTypes = new Set();
+
+    buttons.forEach(btn => {
+      const code = btn.dataset.linenCode;
+      const type = btn.dataset.linenType;
+      if (requiredTypes.includes(type) && !selectedTypes.has(type)) {
+        selectedTypes.add(type);
+        if (!activeLinenItems[code]) {
+          selectLinenItem(code, type, btn);
+        }
+      }
+    });
+
+    if (selectedTypes.size === 0) {
+      alert('No matching linen items in laundry depot stock to form a kit.');
+    }
+  }
+
+  // --- DIRECT ISSUE MODAL JAVASCRIPT ---
+  let directModalInstance = null;
+  const directModalSelectedItems = {};
+
+  function openDirectIssueModal(passengerId, pnrRaw, maskedPnr, berth, name, dest) {
+    document.getElementById('directModalPassengerId').value = passengerId;
+    document.getElementById('directModalPnrRaw').value = pnrRaw;
+    document.getElementById('directModalBerth').textContent = 'Berth ' + berth;
+    document.getElementById('directModalPassenger').textContent = name;
+    document.getElementById('directModalPnr').textContent = maskedPnr;
+    document.getElementById('directModalDest').textContent = dest;
+
+    // Reset previous selection in modal
+    for (const k in directModalSelectedItems) delete directModalSelectedItems[k];
+    document.querySelectorAll('.direct-modal-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.direct-modal-item').forEach(el => el.classList.remove('border-success', 'bg-success-subtle'));
+    updateDirectModalSummary();
+
+    const modalEl = document.getElementById('directIssueModal');
+    directModalInstance = new bootstrap.Modal(modalEl);
+    directModalInstance.show();
+  }
+
+  function toggleDirectModalItem(code, type) {
+    const cb = document.getElementById('chk-' + code);
+    const itemEl = document.getElementById('modal-item-' + code);
+    if (!cb) return;
+
+    // Toggle
+    cb.checked = !cb.checked;
+    if (cb.checked) {
+      // Allow max one of each type
+      for (const [existingCode, existingType] of Object.entries(directModalSelectedItems)) {
+        if (existingType === type && existingCode !== code) {
+          delete directModalSelectedItems[existingCode];
+          const oldCb = document.getElementById('chk-' + existingCode);
+          if (oldCb) oldCb.checked = false;
+          const oldEl = document.getElementById('modal-item-' + existingCode);
+          if (oldEl) oldEl.classList.remove('border-success', 'bg-success-subtle');
+        }
+      }
+      directModalSelectedItems[code] = type;
+      if (itemEl) itemEl.classList.add('border-success', 'bg-success-subtle');
+    } else {
+      delete directModalSelectedItems[code];
+      if (itemEl) itemEl.classList.remove('border-success', 'bg-success-subtle');
+    }
+    updateDirectModalSummary();
+  }
+
+  function autoSelectDirectModalKit() {
+    const requiredTypes = ['Bedsheet', 'Blanket', 'Towel', 'Pillow Cover'];
+    const checkboxes = document.querySelectorAll('.direct-modal-checkbox');
+    const selectedTypes = new Set();
+
+    // Reset first
+    for (const k in directModalSelectedItems) delete directModalSelectedItems[k];
+    checkboxes.forEach(cb => {
+      cb.checked = false;
+      const el = document.getElementById('modal-item-' + cb.dataset.code);
+      if (el) el.classList.remove('border-success', 'bg-success-subtle');
+    });
+
+    checkboxes.forEach(cb => {
+      const code = cb.dataset.code;
+      const type = cb.dataset.type;
+      if (requiredTypes.includes(type) && !selectedTypes.has(type)) {
+        selectedTypes.add(type);
+        cb.checked = true;
+        directModalSelectedItems[code] = type;
+        const el = document.getElementById('modal-item-' + code);
+        if (el) el.classList.add('border-success', 'bg-success-subtle');
+      }
+    });
+
+    updateDirectModalSummary();
+  }
+
+  function updateDirectModalSummary() {
+    const codes = Object.keys(directModalSelectedItems);
+    const summaryEl = document.getElementById('directModalSelectedSummary');
+    const btn = document.getElementById('btnSubmitDirectIssue');
+
+    if (codes.length === 0) {
+      summaryEl.textContent = 'None selected';
+      summaryEl.className = 'font-mono text-muted';
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Select one or more items';
+    } else {
+      summaryEl.textContent = `${codes.length} item(s): ${codes.join(', ')}`;
+      summaryEl.className = 'font-mono fw-bold text-success';
+      btn.disabled = false;
+      btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Confirm & Issue ${codes.length} Linen Item(s)`;
+    }
+  }
+
+  function submitDirectModalIssue() {
+    const pId = document.getElementById('directModalPassengerId').value;
+    const pnr = document.getElementById('directModalPnrRaw').value;
+    const codes = Object.keys(directModalSelectedItems);
+    const btn = document.getElementById('btnSubmitDirectIssue');
+
+    if (!codes.length) {
+      alert('Please select at least one linen item to issue.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Assigning Linen...';
+
+    fetch('/api/attendant/issue/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: JSON.stringify({
+        pnr_number: pnr,
+        linen_codes: codes
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.innerHTML = '✓ Linen Successfully Assigned!';
+        btn.style.background = 'var(--green)';
+
+        // Remove assigned codes from available pools on the page
+        codes.forEach(code => {
+          const itemEl = document.getElementById('modal-item-' + code);
+          if (itemEl) itemEl.parentElement.remove();
+          const scanBtn = document.querySelector(`button[data-linen-code="${code}"]`);
+          if (scanBtn) scanBtn.remove();
+        });
+
+        // Update passenger row
+        const row = document.getElementById('passenger-row-' + pId);
+        if (row) {
+          const statusCol = row.querySelector('td:nth-child(5)');
+          if (statusCol) {
+            statusCol.innerHTML = '<span class="badge bg-success text-white font-mono px-2 py-1" style="font-size: 0.72rem;"><i class="bi bi-check2 me-1"></i> Issued</span>';
+          }
+          const actionCol = row.querySelector('td:last-child');
+          if (actionCol) {
+            actionCol.innerHTML = '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-1 font-mono d-inline-flex align-items-center gap-1" style="font-size: 0.78rem;"><i class="bi bi-check2-circle"></i> Linen Issued</span>';
+          }
+        }
+
+        setTimeout(() => {
+          if (directModalInstance) directModalInstance.hide();
+          window.location.reload();
+        }, 1200);
+      } else {
+        alert(data.message || 'Error issuing linen.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirm & Issue';
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Network error while assigning linen.');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirm & Issue';
+    });
+  }
+
+  // Preselect code if passed in URL query
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeParam = urlParams.get('code');
+    if (codeParam) {
+      simulateScan(codeParam);
+    }
+  });
+</script>
+{% endblock %}

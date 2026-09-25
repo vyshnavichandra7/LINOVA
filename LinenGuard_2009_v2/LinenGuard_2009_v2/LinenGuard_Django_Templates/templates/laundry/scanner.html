@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Laundry Receiving Scanner - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3 class="fw-bold mb-0 text-navy"><i class="bi bi-upc-scan text-primary me-2"></i>SCAN RETURNED LINEN</h3>
+        <p class="text-muted small mb-0">Record physical handover of returned coach bags into central laundry facility</p>
+      </div>
+      <a href="{% url 'laundry_dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Station</a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-navy text-white text-center py-3">
+        <h5 class="fw-bold mb-0">LAUNDRY INTAKE SCANNER</h5>
+        <span class="text-light-50 small">Point camera at QR label or enter code manually</span>
+      </div>
+      <div class="card-body p-4">
+        
+        <!-- Scanner Viewport Area -->
+        <div class="scanner-container mb-3 position-relative">
+          <div id="reader" style="width: 100%;"></div>
+        </div>
+
+        <div id="camera-status" class="text-center mb-3"></div>
+
+        <!-- Manual Input Fallback -->
+        <div class="bg-light p-3 rounded-3 border">
+          <label class="form-label fw-bold text-dark mb-1">Enter Linen Code Manually:</label>
+          <div class="input-group input-group-lg">
+            <input type="text" id="laundry-qr-input" class="form-control font-monospace text-uppercase" placeholder="e.g. BS-10001">
+            <button class="btn btn-primary px-4 fw-bold" id="btn-laundry-receive" type="button">
+              <i class="bi bi-check2-circle me-1"></i> RECEIVE
+            </button>
+          </div>
+        </div>
+
+        <!-- Result Box -->
+        <div id="laundry-result-box" class="mt-3"></div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/qr_scanner.js"></script>
+<script>
+  let html5QrCode = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('reader')) {
+      html5QrCode = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          const cameraId = cameras[cameras.length - 1].id;
+          html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              receiveItem(decodedText);
+            }
+          ).catch(err => {
+            console.warn("Camera start error:", err);
+            document.getElementById('camera-status').innerHTML = '<div class="alert alert-warning py-1 small">Camera unavailable. Use manual input.</div>';
+          });
+        }
+      }).catch(err => {
+        document.getElementById('camera-status').innerHTML = '<div class="alert alert-warning py-1 small">Camera permission denied. Use manual input.</div>';
+      });
+    }
+
+    document.getElementById('btn-laundry-receive').addEventListener('click', function() {
+      const code = document.getElementById('laundry-qr-input').value.trim();
+      if (code) receiveItem(code);
+    });
+
+    document.getElementById('laundry-qr-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        const code = this.value.trim();
+        if (code) receiveItem(code);
+      }
+    });
+  });
+
+  function receiveItem(code) {
+    const box = document.getElementById('laundry-result-box');
+    box.innerHTML = '<div class="text-center py-2 text-primary"><span class="spinner-border spinner-border-sm me-2"></span>Receiving at laundry...</div>';
+
+    fetch('{% url "api_laundry_receive" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ qr_code: code })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        AudioFeedback.playSuccess();
+        box.innerHTML = `
+          <div class="card border-success bg-light text-center p-3">
+            <div class="display-6 text-success"><i class="bi bi-check-circle-fill"></i></div>
+            <h5 class="fw-bold text-success my-1">✓ LINEN RECEIVED AT LAUNDRY</h5>
+            <div class="fs-5 font-monospace fw-bold text-dark">${code}</div>
+            <div class="badge bg-primary fs-6 my-2">Status: RECEIVED_AT_LAUNDRY</div>
+            <p class="small text-muted mb-0">Logged into depot inventory. Ready for washing cycle.</p>
+          </div>
+        `;
+        document.getElementById('laundry-qr-input').value = '';
+      } else {
+        AudioFeedback.playWarning();
+        box.innerHTML = `
+          <div class="alert alert-danger">
+            <i class="bi bi-x-circle me-1"></i> ${data.message}
+          </div>
+        `;
+      }
+    })
+    .catch(err => {
+      box.innerHTML = '<div class="alert alert-danger">Network error connecting to laundry server.</div>';
+    });
+  }
+</script>
+{% endblock %}

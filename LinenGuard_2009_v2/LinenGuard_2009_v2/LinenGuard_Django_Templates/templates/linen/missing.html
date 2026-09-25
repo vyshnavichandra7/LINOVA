@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Unaccounted Linen - LinenGuard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="fw-bold mb-0 text-danger">
+      <i class="bi bi-exclamation-octagon-fill text-danger me-2"></i>UNACCOUNTED LINEN
+    </h3>
+    <p class="text-muted small mb-0">Traceability audit of items with interrupted lifecycles and missing return scans</p>
+  </div>
+  <div class="badge bg-danger fs-6 px-3 py-2">
+    {{ count }} Items Flagged
+  </div>
+</div>
+
+<div class="alert alert-warning border-warning shadow-sm mb-4">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-shield-exclamation fs-3 me-3 text-warning"></i>
+    <div>
+      <h6 class="fw-bold mb-1">Operational Breakpoint Policy</h6>
+      <p class="mb-0 small text-muted">
+        Items are designated <strong>"Unaccounted Linen"</strong> when the expected attender collection event is not recorded within the grace period. The system isolates the <strong>Last Verified Checkpoint</strong> to aid targeted railway terminal review.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-railway mb-0">
+        <thead>
+          <tr>
+            <th>Linen ID</th>
+            <th>Type</th>
+            <th>Train</th>
+            <th>Coach</th>
+            <th>Berth</th>
+            <th>Last Verified Stage</th>
+            <th>Last Verified Time</th>
+            <th>Expected Collection</th>
+            <th>Status</th>
+            <th class="text-center">Lifecycle Trace</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in item_reports %}
+          <tr>
+            <td>
+              <a href="{% url 'linen_detail' report.linen.linen_code %}" class="fw-bold font-monospace text-danger text-decoration-none">
+                {{ report.linen.linen_code }}
+              </a>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ report.linen.linen_type }}</span></td>
+            <td>
+              {% if report.assignment %}
+                <span class="fw-semibold">{{ report.assignment.train.train_number }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if report.assignment %}
+                <span class="badge bg-primary">{{ report.assignment.coach.coach_number }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if report.assignment and report.assignment.berth %}
+                <span class="fw-bold text-dark">{{ report.assignment.berth }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-warning text-dark">
+                {{ report.checkpoint.stage }}
+              </span>
+            </td>
+            <td class="small text-muted font-monospace">
+              {{ report.checkpoint.timestamp|date:"h:i A, d M" }}
+            </td>
+            <td class="small text-muted font-monospace">
+              {% if report.assignment and report.assignment.expected_collection_time %}
+                {{ report.assignment.expected_collection_time|date:"h:i A" }}
+              {% else %}
+                06:30 AM
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-danger">{{ report.linen.status }}</span>
+            </td>
+            <td class="text-center">
+              <a href="{% url 'linen_lifecycle' report.linen.linen_code %}" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-clock-history me-1"></i>Track Break
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center py-5 text-muted">
+              <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+              No unaccounted linen items detected. All items accounted for!
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

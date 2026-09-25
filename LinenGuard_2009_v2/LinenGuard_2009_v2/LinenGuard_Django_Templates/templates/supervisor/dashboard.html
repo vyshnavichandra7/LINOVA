@@ -1,0 +1,175 @@
+{% extends "supervisor/base_supervisor.html" %}
+
+{% block title %}Operations Dashboard - Supervisor Console{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column">
+
+  <!-- Header -->
+  <div class="supervisor-header-bar">
+    <div>
+      <h1 class="h3 fw-bold mb-1 text-white">Operations Command Dashboard</h1>
+      <div class="small" style="color: var(--admin-muted);">
+        Real-time Depot & Coach Traceability Telemetry
+      </div>
+    </div>
+    <div class="small text-secondary">
+      <i class="bi bi-clock-history me-1"></i> Live operational cycle
+    </div>
+  </div>
+
+  <!-- Row of headline KPI stats rendered as split-flap readouts -->
+  <!-- Total linen, Issued, Returned, Unaccounted, Damaged, Sync conflicts -->
+  <div class="row g-3 mb-4">
+    
+    <!-- 1. Total Linen -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: var(--admin-muted); font-size: 0.72rem;">Total Linen</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in total_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Issued -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: var(--admin-muted); font-size: 0.72rem;">Issued</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in issued_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Returned -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: #6edaa0; font-size: 0.72rem;">Returned</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in returned_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Unaccounted -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: #f7a09d; font-size: 0.72rem;">Unaccounted</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in unaccounted_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Damaged -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: var(--admin-muted); font-size: 0.72rem;">Damaged</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in damaged_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Sync Conflicts -->
+    <div class="col-md-4 col-lg-2">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <div class="small text-uppercase fw-semibold mb-2" style="color: var(--admin-muted); font-size: 0.72rem;">Sync Conflicts</div>
+        <div class="split-flap-board sm mb-1">
+          {% for ch in conflicts_chars %}
+          <span class="split-flap-cell">{{ ch }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="row g-4">
+    <!-- Operational Priorities Table: Train | Coach | Loss rate | Risk tag -->
+    <div class="col-lg-7">
+      <div class="p-3 rounded-3 border" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <h2 class="h6 fw-bold text-white mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-shield-exclamation text-warning"></i> Operational Priorities (Coach Hotspots)
+        </h2>
+
+        <div class="table-responsive">
+          <table class="supervisor-table">
+            <thead>
+              <tr>
+                <th>Train</th>
+                <th>Coach</th>
+                <th>Loss Rate</th>
+                <th>Risk Tag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for h in analytics.coach_hotspots|slice:":6" %}
+              <tr>
+                <td class="font-mono fw-bold text-white">{{ h.train.train_number }}</td>
+                <td>Coach {{ h.coach.coach_number }}</td>
+                <td class="font-mono {% if h.rate > 4.0 %}text-danger{% elif h.rate > 1.0 %}text-warning{% else %}text-success{% endif %}">
+                  {{ h.rate }}% ({{ h.unaccounted }}/{{ h.expected }})
+                </td>
+                <td>
+                  {% if h.rate > 4.0 %}
+                  <span class="badge bg-danger text-white">HIGH</span>
+                  {% elif h.rate > 1.0 %}
+                  <span class="badge bg-warning text-dark">MEDIUM</span>
+                  {% else %}
+                  <span class="badge bg-success text-white">LOW</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-center py-3 text-muted">All coaches reconciled.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simple CSS bar-row component for "loss by route" (NO Chart.js) -->
+    <div class="col-lg-5">
+      <div class="p-3 rounded-3 border h-100" style="background: var(--admin-panel); border-color: var(--admin-border) !important;">
+        <h2 class="h6 fw-bold text-white mb-3 d-flex align-items-center gap-2">
+          <i class="bi bi-bar-chart-steps text-info"></i> Loss by Route
+        </h2>
+
+        <div class="d-flex flex-column gap-3 mt-2">
+          {% for r in route_loss_data %}
+          <div class="route-loss-row">
+            <div class="route-loss-meta">
+              <span class="text-white small fw-semibold">{{ r.route }}</span>
+              <span class="font-mono small {% if r.risk == 'HIGH' %}text-danger{% elif r.risk == 'MEDIUM' %}text-warning{% else %}text-success{% endif %}">
+                {{ r.loss_rate }}% ({{ r.missing }} items)
+              </span>
+            </div>
+            <div class="route-loss-bar-track">
+              <div class="route-loss-bar-fill {% if r.risk == 'HIGH' %}high{% endif %}" style="width: {{ r.loss_rate|floatformat:0 }}0%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="mt-4 p-2 px-3 rounded-2 text-secondary small border" style="background: #0b141d; border-color: var(--admin-border) !important;">
+          <i class="bi bi-info-circle me-1"></i> Checkpoint data isolated strictly to last verified physical scans.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
